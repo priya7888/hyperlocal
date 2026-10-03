@@ -438,8 +438,6 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
             />
           </div>
 
-          </div>
-
           {/* Actions */}
           <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "2px" }}>
             <button
