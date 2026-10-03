@@ -201,15 +201,18 @@ export default function CitizenDashboard({ currentUser, onOpenSos, onLogout, ini
     }
   };
 
-  const handleClearAllReports = () => {
+  const handleClearAllReports = async () => {
     sounds.playTap();
-    if (window.confirm("Clear all past emergency reports from your list?")) {
+    if (window.confirm("Clear all past emergency reports and reset system?")) {
       setIncidents([]);
       setActiveIncident(null);
+      setRouteCoords([]);
+      setResponderLiveLoc(null);
       try {
         localStorage.removeItem("app_incidents");
         localStorage.removeItem("emergency_offline_pending_reports");
       } catch (err) {}
+      await incidentApi.purgeAllStatic();
       setViewMode("list");
     }
   };
