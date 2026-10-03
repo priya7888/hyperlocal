@@ -24,7 +24,7 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
   const [checklistError, setChecklistError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
-  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(true);
   const [coords, setCoords] = useState(() => {
     const savedLat = parseFloat(localStorage.getItem("last_device_gps_lat"));
     const savedLng = parseFloat(localStorage.getItem("last_device_gps_lng"));
@@ -36,7 +36,7 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
       setChecklist([]);
       setDescription("");
       setChecklistError("");
-      setShowMapPicker(false);
+      setShowMapPicker(true);
       handleDetectLocation();
     }
   }, [isOpen]);
@@ -44,7 +44,7 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
   const handleDetectLocation = async () => {
     sounds.playTap();
     setIsLocating(true);
-    const loc = await getDeviceLocation(17.5800, 78.4867);
+    const loc = await getDeviceLocation(coords.lat || 17.5800, coords.lng || 78.4867);
     setCoords({ lat: loc.lat, lng: loc.lng });
     sounds.playStep();
     setIsLocating(false);
