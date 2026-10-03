@@ -11,7 +11,7 @@ import { incidentApi, responderApi, routingApi, socket, deduplicateIncidents, ge
 import { sounds } from "../services/soundEffects";
 
 // Check if an incident belongs to this responder's emergency service wing
-export const isIncidentMatchingService = (incident, responderServiceType) => {
+const isIncidentMatchingService = (incident, responderServiceType) => {
   if (!incident) return false;
   if (!responderServiceType) return true;
   
