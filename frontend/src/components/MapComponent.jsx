@@ -53,7 +53,7 @@ const createCustomIcon = (type = "Ambulance", label = "") => {
       transform: translate(-50%, -50%);
     ">
       <span>${iconSvg}</span>
-      ${label ? `<div style="position:absolute; bottom:-22px; white-space:nowrap; background:#111827; color:#f8fafc; font-size:11px; font-weight:bold; padding:2px 8px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);">${label}</div>` : ''}
+      ${label ? `<div style="position:absolute; ${type === 'citizen' ? 'top:-24px;' : 'bottom:-24px;'} white-space:nowrap; background:#111827; color:#f8fafc; font-size:11px; font-weight:bold; padding:2px 8px; border-radius:10px; border:1px solid rgba(255,255,255,0.3); box-shadow:0 2px 10px rgba(0,0,0,0.8); pointer-events:none;">${label}</div>` : ''}
     </div>
   `;
 

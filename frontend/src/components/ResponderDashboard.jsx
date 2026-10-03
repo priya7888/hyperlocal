@@ -98,6 +98,7 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
   const [routeCoords, setRouteCoords] = useState([]);
   const [routeStats, setRouteStats] = useState({ distanceKm: 0, durationMinutes: 0 });
   const [isAvailable, setIsAvailable] = useState(true);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   // Modal for Viewing Full Citizen & Incident Details
   const [selectedDetailIncident, setSelectedDetailIncident] = useState(null);
@@ -375,12 +376,75 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
     }
   };
 
+  const handleToggleSimulation = () => {
+    if (isSimulating) {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      setIsSimulating(false);
+      sounds.playTap();
+      return;
+    }
+
+    if (!activeIncident) return;
+    sounds.playSuccess();
+    setIsSimulating(true);
+
+    // If not En Route, mark it En Route
+    if (activeIncident.status !== "En Route" && activeIncident.status !== "On Scene") {
+      handleStatusChange("En Route");
+    }
+
+    const steps = [];
+    if (routeCoords && routeCoords.length > 1) {
+      for (let i = 0; i < routeCoords.length - 1; i++) {
+        const p1 = routeCoords[i];
+        const p2 = routeCoords[i + 1];
+        const subSteps = 3;
+        for (let s = 0; s < subSteps; s++) {
+          const lat = p1[0] + (p2[0] - p1[0]) * (s / subSteps);
+          const lng = p1[1] + (p2[1] - p1[1]) * (s / subSteps);
+          steps.push({ lat, lng });
+        }
+      }
+      steps.push({ lat: activeIncident.lat, lng: activeIncident.lng });
+    } else {
+      const startLat = responderCoords.lat;
+      const startLng = responderCoords.lng;
+      const endLat = activeIncident.lat;
+      const endLng = activeIncident.lng;
+      for (let i = 1; i <= 20; i++) {
+        steps.push({
+          lat: startLat + (endLat - startLat) * (i / 20),
+          lng: startLng + (endLng - startLng) * (i / 20)
+        });
+      }
+    }
+
+    let stepIndex = 0;
+    if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+
+    simIntervalRef.current = setInterval(() => {
+      if (stepIndex >= steps.length) {
+        clearInterval(simIntervalRef.current);
+        setIsSimulating(false);
+        updateResponderLocation(activeIncident.lat, activeIncident.lng, true);
+        handleStatusChange("On Scene");
+        sounds.showSystemNotification("📍 Arrived On Scene!", `Unit reached incident ${activeIncident.id}`);
+        return;
+      }
+
+      const nextLoc = steps[stepIndex];
+      updateResponderLocation(nextLoc.lat, nextLoc.lng, true);
+      sounds.playStep();
+      stepIndex++;
+    }, 850);
+  };
+
   const handleStatusChange = async (nextStatus) => {
     if (!activeIncident) return;
     if (nextStatus === "Resolved") {
       sounds.playSuccess();
       if (simIntervalRef.current) clearInterval(simIntervalRef.current);
-      setIsSimulatingMovement(false);
+      setIsSimulating(false);
     } else {
       sounds.playStep();
     }
@@ -1023,6 +1087,30 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
                     </button>
                   )}
 
+                  {/* Live Route Travel Simulator Button */}
+                  <button
+                    onClick={handleToggleSimulation}
+                    style={{
+                      gridColumn: "span 2",
+                      background: isSimulating ? "rgba(255, 51, 75, 0.2)" : "rgba(0, 229, 255, 0.15)",
+                      border: isSimulating ? "1px solid #ff334b" : "1px solid #00e5ff",
+                      color: isSimulating ? "#ff4d67" : "#00e5ff",
+                      borderRadius: "8px",
+                      padding: "10px",
+                      fontSize: "0.84rem",
+                      fontWeight: "800",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    {isSimulating ? <Pause size={15} /> : <Play size={15} />}
+                    {isSimulating ? "⏸️ Pause Route Simulation" : "▶️ Demo: Simulate Driving Along Route"}
+                  </button>
+
                   <button
                     onClick={() => handleStatusChange("Resolved")}
                     style={{
@@ -1031,7 +1119,7 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
                       color: "#070a12",
                       border: "none",
                       borderRadius: "8px",
-                      padding: "10px",
+                      padding: "11px",
                       fontSize: "0.88rem",
                       fontWeight: "900",
                       cursor: "pointer"
