@@ -368,6 +368,18 @@ export const incidentApi = {
 
   clearHistory: () => {
     localStorage.removeItem("app_incidents");
+    localStorage.removeItem("emergency_offline_pending_reports");
+  },
+
+  purgeAllStatic: async () => {
+    localStorage.removeItem("app_incidents");
+    localStorage.removeItem("emergency_offline_pending_reports");
+    try {
+      const res = await api.post("/admin/clean-all-static");
+      return res.data;
+    } catch (e) {
+      return { success: true };
+    }
   }
 };
 

@@ -117,6 +117,21 @@ export default function AdminDashboard({ currentUser }) {
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <button
+            onClick={async () => {
+              if (window.confirm("Purge all old incidents and reset system for live multi-device demonstration?")) {
+                await incidentApi.purgeAllStatic();
+                loadAllData();
+                alert("✅ Database wiped clean. Ready for 100% live multi-device demonstration!");
+              }
+            }}
+            className="btn-outline"
+            style={{ fontSize: "0.85rem", color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.4)" }}
+            title="Reset/Wipe old test incidents"
+          >
+            <AlertTriangle size={14} /> Reset Incidents (Live Demo)
+          </button>
+
+          <button
             onClick={() => setIsCreatingAlert(true)}
             className="btn-emergency-main"
             style={{ fontSize: "0.85rem", padding: "8px 16px", borderRadius: "8px" }}

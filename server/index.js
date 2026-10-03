@@ -804,6 +804,22 @@ io.on('connection', (socket) => {
     const { incidentId, lat, lng, heading, responderName } = data;
     io.emit('responder_gps_update', { incidentId, lat, lng, heading, responderName });
   });
+
+  socket.on('responder_location_ping', async (data) => {
+    const { userId, responderId, lat, lng, serviceType } = data;
+    if (lat && lng) {
+      try {
+        if (userId) {
+          await dbRun('UPDATE responders SET lat = ?, lng = ?, last_active = CURRENT_TIMESTAMP WHERE user_id = ?', [lat, lng, userId]);
+        } else if (responderId) {
+          await dbRun('UPDATE responders SET lat = ?, lng = ?, last_active = CURRENT_TIMESTAMP WHERE id = ?', [lat, lng, responderId]);
+        }
+        io.emit('responder_location_ping', data);
+      } catch (e) {
+        console.warn("Error updating responder location ping:", e.message);
+      }
+    }
+  });
 });
 
 // ================= DATABASE DEDUPLICATION ROUTINE =================
@@ -812,7 +828,9 @@ async function cleanDatabaseDuplicates() {
     // 1. Remove static demo incidents (INC-2026-1049, INC-2026-1032, etc.)
     await dbRun(`
       DELETE FROM incidents 
-      WHERE id IN ('INC-2026-1049', 'INC-2026-1032')
+      WHERE id IN ('INC-2026-1049', 'INC-2026-1032', 'INC-2025-001', 'INC-2025-002', 'INC-2025-003')
+         OR id LIKE '%SIM%'
+         OR id LIKE '%DEMO%'
     `);
 
     // 2. Remove duplicate incidents with identical IDs
@@ -855,6 +873,19 @@ async function cleanDatabaseDuplicates() {
 app.post('/api/admin/clean-duplicates', async (req, res) => {
   await cleanDatabaseDuplicates();
   res.json({ success: true, message: "All duplicate data removed from database." });
+});
+
+// Admin API to clean/purge all old incidents for a fresh multi-device demonstration
+app.post('/api/admin/clean-all-static', async (req, res) => {
+  try {
+    await dbRun("DELETE FROM incidents WHERE 1=1");
+    await dbRun("DELETE FROM incident_updates WHERE 1=1");
+    await dbRun("DELETE FROM incident_chats WHERE 1=1");
+    io.emit('incident_status_changed', { message: 'All incidents reset for live multi-device demonstration' });
+    res.json({ success: true, message: "All static data deleted. System reset for live dynamic GPS demonstration." });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ================= SERVER STARTUP =================

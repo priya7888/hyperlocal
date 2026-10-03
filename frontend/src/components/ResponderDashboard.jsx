@@ -106,6 +106,8 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
   });
   const [isLocating, setIsLocating] = useState(false);
   const [isSimulatingMovement, setIsSimulatingMovement] = useState(false);
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
+  const [tempPickerCoords, setTempPickerCoords] = useState({ lat: 17.5950, lng: 78.4950 });
   const simIntervalRef = useRef(null);
   const geoWatchIdRef = useRef(null);
 
@@ -116,16 +118,47 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
   const serviceType = currentUser?.service_type || "Ambulance";
   const responderName = currentUser?.full_name || `${serviceType} Officer`;
 
+  const updateResponderLocation = (lat, lng) => {
+    const validLat = parseFloat(Number(lat).toFixed(5));
+    const validLng = parseFloat(Number(lng).toFixed(5));
+    setResponderCoords({ lat: validLat, lng: validLng });
+    localStorage.setItem("last_device_gps_lat", validLat.toString());
+    localStorage.setItem("last_device_gps_lng", validLng.toString());
+    responderApi.updateLocation(validLat, validLng);
+    socket.emit("responder_location_ping", {
+      userId: currentUser?.id,
+      responderId: currentUser?.responderId,
+      lat: validLat,
+      lng: validLng,
+      serviceType,
+      responderName
+    });
+  };
+
   useEffect(() => {
     loadIncidents();
     handleDetectGPS();
+
+    // 1. Continuous Live Hardware GPS Watch on this device
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (pos && pos.coords) {
+            updateResponderLocation(pos.coords.latitude, pos.coords.longitude);
+          }
+        },
+        (err) => console.warn("GPS watch notice:", err.message),
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 8000 }
+      );
+      geoWatchIdRef.current = watchId;
+    }
 
     if (currentUser?.responderId) {
       socket.emit("join_responder", currentUser.responderId);
     }
     socket.emit("join_dispatch");
 
-    // 1. Direct 5-Minute Escalation incoming job alert (Filtered strictly by service belonging)
+    // 2. Direct 5-Minute Escalation incoming job alert (Filtered strictly by service belonging)
     socket.on("incoming_job_alert", (data) => {
       const inc = data.incident || data;
       if (!isIncidentMatchingService(inc, serviceType)) {
@@ -137,7 +170,7 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
       setCountdown(data.timeoutSeconds || 300);
     });
 
-    // 2. Real-time Emergency SOS broadcast from citizen (Filtered strictly by service belonging)
+    // 3. Real-time Emergency SOS broadcast from citizen (Filtered strictly by service belonging)
     socket.on("incident_created", (newInc) => {
       loadIncidents();
       if (!isIncidentMatchingService(newInc, serviceType)) {
@@ -201,9 +234,8 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
     sounds.playTap();
     setIsLocating(true);
     const loc = await getDeviceLocation(17.5950, 78.4950);
-    setResponderCoords({ lat: loc.lat, lng: loc.lng });
+    updateResponderLocation(loc.lat, loc.lng);
     setIsLocating(false);
-    responderApi.updateLocation(loc.lat, loc.lng);
   };
 
   const startLiveGpsBroadcasting = (incidentId) => {
@@ -213,9 +245,7 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
         (pos) => {
           const lat = parseFloat(pos.coords.latitude.toFixed(5));
           const lng = parseFloat(pos.coords.longitude.toFixed(5));
-          localStorage.setItem("last_device_gps_lat", lat.toString());
-          localStorage.setItem("last_device_gps_lng", lng.toString());
-          setResponderCoords({ lat, lng });
+          updateResponderLocation(lat, lng);
           socket.emit("live_gps_stream", {
             incidentId,
             lat,
@@ -741,6 +771,77 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
         </div>
       )}
 
+      {/* RESPONDER INTERACTIVE MAP LOCATION PICKER MODAL */}
+      {isMapPickerOpen && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal-container" style={{
+            maxWidth: "600px",
+            width: "92vw",
+            padding: "20px",
+            background: "#0d1322",
+            border: "1.5px solid rgba(0, 229, 255, 0.4)",
+            borderRadius: "18px",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.8)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "14px"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: "900", color: "#f8fafc", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <MapPin size={18} color="#00e5ff" /> Set {serviceType} Unit Location on Map
+                </h3>
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                  Click anywhere on the map or drag the target pin to set this unit's location.
+                </div>
+              </div>
+              <button
+                onClick={() => setIsMapPickerOpen(false)}
+                style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#f8fafc", borderRadius: "50%", width: "30px", height: "30px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ height: "300px", borderRadius: "12px", overflow: "hidden", border: "1px solid rgba(0, 229, 255, 0.3)" }}>
+              <MapComponent
+                height="100%"
+                center={[tempPickerCoords.lat, tempPickerCoords.lng]}
+                zoom={14}
+                pickerMode={true}
+                pickerCoords={tempPickerCoords}
+                onPickerCoordsChange={(lat, lng) => setTempPickerCoords({ lat, lng })}
+              />
+            </div>
+
+            <div style={{ background: "rgba(0, 229, 255, 0.08)", padding: "10px 14px", borderRadius: "8px", fontSize: "0.82rem", color: "#cbd5e1" }}>
+              Selected Coordinates: <strong style={{ color: "#00e5ff", fontFamily: "monospace" }}>{tempPickerCoords.lat.toFixed(5)}, {tempPickerCoords.lng.toFixed(5)}</strong>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  updateResponderLocation(tempPickerCoords.lat, tempPickerCoords.lng);
+                  setIsMapPickerOpen(false);
+                }}
+                className="btn-emergency-main"
+                style={{ padding: "10px 18px", fontSize: "0.85rem" }}
+              >
+                <Check size={16} style={{ display: "inline", marginRight: "4px" }} /> Confirm Unit Location
+              </button>
+              <button
+                onClick={() => setIsMapPickerOpen(false)}
+                className="btn-outline"
+                style={{ padding: "10px 14px", fontSize: "0.85rem" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Console Bar */}
       <header style={{
         display: "flex",
@@ -768,15 +869,29 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
           <button
             onClick={handleDetectGPS}
             className="btn-outline"
             style={{ padding: "8px 12px", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "5px" }}
-            title="Calibrate GPS"
+            title="Auto Detect GPS"
           >
             <Compass size={14} className={isLocating ? "animate-spin" : ""} />
             <span>GPS: {responderCoords.lat.toFixed(3)}, {responderCoords.lng.toFixed(3)}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              sounds.playTap();
+              setTempPickerCoords({ lat: responderCoords.lat, lng: responderCoords.lng });
+              setIsMapPickerOpen(true);
+            }}
+            className="btn-outline"
+            style={{ padding: "8px 12px", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "5px", color: "#00e5ff", borderColor: "rgba(0, 229, 255, 0.4)" }}
+            title="Click or Drag on Map to set location"
+          >
+            <MapPin size={14} />
+            <span>Pick on Map</span>
           </button>
 
           <button
