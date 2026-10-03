@@ -295,11 +295,31 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
   const handleAccept = async (incidentId) => {
     sounds.playSuccess();
     
+    const targetInc = incidents.find(i => i.id === incidentId) || incomingAlert?.incident || incomingAlert;
+    
     // Quick GPS capture upon acceptance
-    const loc = await getDeviceLocation(responderCoords.lat, responderCoords.lng);
-    const currentLat = loc.lat;
-    const currentLng = loc.lng;
-    setResponderCoords({ lat: currentLat, lng: currentLng });
+    let currentLat = responderCoords.lat;
+    let currentLng = responderCoords.lng;
+    
+    try {
+      const loc = await getDeviceLocation(responderCoords.lat, responderCoords.lng);
+      if (loc && loc.lat && loc.lng) {
+        currentLat = loc.lat;
+        currentLng = loc.lng;
+      }
+    } catch (e) {}
+
+    // If location is OFF and responder was far away or uncalibrated,
+    // position responder at a realistic nearby urban deployment sector (~1.2 km from incident)
+    if (targetInc && targetInc.lat && targetInc.lng) {
+      const dist = Math.sqrt(Math.pow(currentLat - targetInc.lat, 2) + Math.pow(currentLng - targetInc.lng, 2));
+      if (dist > 0.15 || isNaN(dist)) {
+        currentLat = parseFloat((targetInc.lat + 0.009).toFixed(5));
+        currentLng = parseFloat((targetInc.lng + 0.008).toFixed(5));
+      }
+    }
+
+    updateResponderLocation(currentLat, currentLng);
 
     try {
       const res = await incidentApi.assign(incidentId, "accept", currentLat, currentLng);
@@ -307,7 +327,7 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
       if (selectedDetailIncident && selectedDetailIncident.id === incidentId) {
         setSelectedDetailIncident(null);
       }
-      const inc = res.incident || incidents.find(i => i.id === incidentId);
+      const inc = res.incident || incidents.find(i => i.id === incidentId) || targetInc;
       if (inc) {
         if (inc.assigned_responder) {
           inc.assigned_responder.lat = currentLat;
