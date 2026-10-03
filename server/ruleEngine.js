@@ -149,12 +149,11 @@ function classifyEmergencyAndSeverity(emergencyType, description = '', checklist
 }
 
 // Find Ranked Responders based on Service and ETA
-async function findRankedResponders(serviceType, incidentLat, incidentLng, maxRadiusKm = 50.0) {
-  // Query all available and verified responders
+async function findRankedResponders(serviceType, incidentLat, incidentLng, maxRadiusKm = 150.0) {
   let responders = [];
   try {
     if (serviceType && serviceType !== 'All') {
-      // First try to find responders of the requested service
+      // Query verified and available responders of requested service
       const matched = await dbAll(
         `SELECT r.*, u.full_name, u.phone, u.email
          FROM responders r
@@ -165,7 +164,6 @@ async function findRankedResponders(serviceType, incidentLat, incidentLng, maxRa
         [serviceType]
       );
       
-      // Also get any other active units
       const others = await dbAll(
         `SELECT r.*, u.full_name, u.phone, u.email
          FROM responders r
@@ -191,21 +189,23 @@ async function findRankedResponders(serviceType, incidentLat, incidentLng, maxRa
 
   const ranked = [];
   for (const resp of responders) {
-    const dist = calculateHaversineDistance(incidentLat, incidentLng, resp.lat || 17.5950, resp.lng || 78.4950);
-    if (dist.km <= maxRadiusKm) {
-      const eta = estimateTravelTime(dist.km);
-      ranked.push({
-        ...resp,
-        distance_km: dist.km,
-        distance_meters: dist.meters,
-        eta_minutes: eta.minutes,
-        eta_seconds: eta.seconds,
-        is_exact_service: resp.service_type === serviceType
-      });
-    }
+    const respLat = resp.lat || incidentLat || 17.5950;
+    const respLng = resp.lng || incidentLng || 78.4950;
+    const dist = calculateHaversineDistance(incidentLat, incidentLng, respLat, respLng);
+    
+    // Calculate realistic road ETA
+    const eta = estimateTravelTime(dist.km);
+    ranked.push({
+      ...resp,
+      distance_km: dist.km,
+      distance_meters: dist.meters,
+      eta_minutes: eta.minutes,
+      eta_seconds: eta.seconds,
+      is_exact_service: resp.service_type === serviceType
+    });
   }
 
-  // Sort by exact service match first, then by ETA / distance ascending
+  // Sort: matching service track first, then ascending by distance
   ranked.sort((a, b) => {
     if (a.is_exact_service && !b.is_exact_service) return -1;
     if (!a.is_exact_service && b.is_exact_service) return 1;
