@@ -105,22 +105,30 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
     return (!isNaN(savedLat) && !isNaN(savedLng)) ? { lat: savedLat, lng: savedLng } : { lat: 17.5950, lng: 78.4950 };
   });
   const [isLocating, setIsLocating] = useState(false);
-  const [isSimulatingMovement, setIsSimulatingMovement] = useState(false);
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
   const [tempPickerCoords, setTempPickerCoords] = useState({ lat: 17.5950, lng: 78.4950 });
-  const simIntervalRef = useRef(null);
   const geoWatchIdRef = useRef(null);
 
   // Incoming Emergency Alert Modal
   const [incomingAlert, setIncomingAlert] = useState(null);
   const [countdown, setCountdown] = useState(300); // 5 minutes
 
-  const serviceType = currentUser?.service_type || "Ambulance";
-  const responderName = currentUser?.full_name || `${serviceType} Officer`;
+  const lastUpdatedCoordsRef = useRef(null);
 
-  const updateResponderLocation = (lat, lng) => {
+  const updateResponderLocation = (lat, lng, force = false) => {
     const validLat = parseFloat(Number(lat).toFixed(5));
     const validLng = parseFloat(Number(lng).toFixed(5));
+
+    // Prevent micro-jitter/drift when sitting still (requires at least ~6m change)
+    if (!force && lastUpdatedCoordsRef.current) {
+      const dLat = Math.abs(validLat - lastUpdatedCoordsRef.current.lat);
+      const dLng = Math.abs(validLng - lastUpdatedCoordsRef.current.lng);
+      if (dLat < 0.00006 && dLng < 0.00006) {
+        return; // Ignore stationary noise
+      }
+    }
+
+    lastUpdatedCoordsRef.current = { lat: validLat, lng: validLng };
     setResponderCoords({ lat: validLat, lng: validLng });
     localStorage.setItem("last_device_gps_lat", validLat.toString());
     localStorage.setItem("last_device_gps_lng", validLng.toString());
@@ -133,18 +141,26 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
       serviceType,
       responderName
     });
+    if (activeIncident) {
+      socket.emit("live_gps_stream", {
+        incidentId: activeIncident.id,
+        lat: validLat,
+        lng: validLng,
+        responderName
+      });
+    }
   };
 
   useEffect(() => {
     loadIncidents();
-    handleDetectGPS();
+    handleDetectGPS(true);
 
-    // 1. Continuous Live Hardware GPS Watch on this device
+    // 1. Continuous Live Hardware GPS Watch on this device (Updates ONLY when physically moving)
     if (typeof navigator !== "undefined" && navigator.geolocation) {
       const watchId = navigator.geolocation.watchPosition(
         (pos) => {
           if (pos && pos.coords) {
-            updateResponderLocation(pos.coords.latitude, pos.coords.longitude);
+            updateResponderLocation(pos.coords.latitude, pos.coords.longitude, false);
           }
         },
         (err) => console.warn("GPS watch notice:", err.message),
@@ -389,42 +405,6 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
         setActiveIncident({ ...activeIncident, status: nextStatus });
       }
     }
-  };
-
-  // Real-time simulated movement towards citizen
-  const simulateLiveMovement = () => {
-    if (!activeIncident || !routeCoords || routeCoords.length < 2) return;
-    sounds.playStep();
-    setIsSimulatingMovement(true);
-
-    if (activeIncident.status === "Reported" || activeIncident.status === "Assigned") {
-      handleStatusChange("En Route");
-    }
-
-    let step = 0;
-    if (simIntervalRef.current) clearInterval(simIntervalRef.current);
-    simIntervalRef.current = setInterval(() => {
-      if (step < routeCoords.length) {
-        const [lat, lng] = routeCoords[step];
-        setResponderCoords({ lat, lng });
-        socket.emit("live_gps_stream", {
-          incidentId: activeIncident.id,
-          lat,
-          lng,
-          responderName
-        });
-        step += 1;
-      } else {
-        clearInterval(simIntervalRef.current);
-        setIsSimulatingMovement(false);
-        handleStatusChange("On Scene");
-      }
-    }, 1200);
-  };
-
-  const stopSimulatedMovement = () => {
-    if (simIntervalRef.current) clearInterval(simIntervalRef.current);
-    setIsSimulatingMovement(false);
   };
 
   // Filter unassigned reports strictly matching this responder's service
@@ -1058,41 +1038,24 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
                   </button>
                 </div>
 
-                {/* Real-Time Driving Simulation Button */}
-                <button
-                  onClick={isSimulatingMovement ? stopSimulatedMovement : simulateLiveMovement}
-                  style={{
-                    marginTop: "6px",
-                    background: isSimulatingMovement ? "rgba(255, 51, 75, 0.2)" : "rgba(0, 229, 255, 0.15)",
-                    border: isSimulatingMovement ? "1px solid #ff334b" : "1px solid #00e5ff",
-                    color: isSimulatingMovement ? "#ff4d67" : "#00e5ff",
-                    borderRadius: "8px",
-                    padding: "10px",
-                    fontSize: "0.82rem",
-                    fontWeight: "800",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px"
-                  }}
-                >
-                  {isSimulatingMovement ? (
-                    <>
-                      <Pause size={15} /> Pause Real-Time Movement
-                    </>
-                  ) : (
-                    <>
-                      <Play size={15} /> 🚀 Drive Towards Citizen (Stream Live GPS)
-                    </>
-                  )}
-                </button>
-                
-                {isSimulatingMovement && (
-                  <div style={{ fontSize: "0.72rem", color: "#00ff88", textAlign: "center", animation: "pulse 1s infinite" }}>
-                    ● Streaming live GPS coordinates to citizen in real-time...
-                  </div>
-                )}
+                {/* Pure Physical GPS Stream Active Status Badge */}
+                <div style={{
+                  marginTop: "8px",
+                  background: "rgba(0, 229, 255, 0.12)",
+                  border: "1px solid rgba(0, 229, 255, 0.4)",
+                  color: "#00e5ff",
+                  borderRadius: "8px",
+                  padding: "10px 14px",
+                  fontSize: "0.8rem",
+                  fontWeight: "800",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px"
+                }}>
+                  <Navigation size={15} color="#00ff88" style={{ animation: "pulse 1.5s infinite" }} />
+                  <span>📡 Live Physical GPS Active • Updates as you travel</span>
+                </div>
               </div>
 
             </div>
