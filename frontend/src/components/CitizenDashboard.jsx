@@ -47,9 +47,12 @@ export default function CitizenDashboard({ currentUser, onOpenSos, onLogout, ini
         setActiveIncident(data);
         setViewMode("details");
         setIncidents((prev) => deduplicateIncidents([data, ...prev]));
-        if (data.assigned_responder) {
+        if (data.assigned_responder && data.status !== "Reported" && data.status !== "Awaiting Responder") {
           setResponderLiveLoc({ lat: data.assigned_responder.lat, lng: data.assigned_responder.lng });
           fetchRoute(data);
+        } else {
+          setResponderLiveLoc(null);
+          setRouteCoords([]);
         }
         setAcceptanceToast({
           title: "🚨 Emergency Dispatched!",
@@ -170,9 +173,11 @@ export default function CitizenDashboard({ currentUser, onOpenSos, onLogout, ini
     sounds.playTap();
     setActiveIncident(inc);
     setViewMode("details");
-    if (inc.assigned_responder) {
+    if (inc.assigned_responder && inc.status !== "Reported" && inc.status !== "Awaiting Responder") {
+      setResponderLiveLoc({ lat: inc.assigned_responder.lat, lng: inc.assigned_responder.lng });
       fetchRoute(inc);
     } else {
+      setResponderLiveLoc(null);
       setRouteCoords([]);
     }
   };
@@ -210,15 +215,25 @@ export default function CitizenDashboard({ currentUser, onOpenSos, onLogout, ini
   };
 
   const fetchRoute = async (incident) => {
-    if (!incident.assigned_responder) return;
+    if (!incident || !incident.assigned_responder || incident.status === "Reported" || incident.status === "Awaiting Responder") {
+      setRouteCoords([]);
+      return;
+    }
     try {
       const r = incident.assigned_responder;
+      if (!r.lat || !r.lng || !incident.lat || !incident.lng) {
+        setRouteCoords([]);
+        return;
+      }
       const res = await routingApi.getRoute(r.lat, r.lng, incident.lat, incident.lng);
       if (res && res.coordinates) {
         setRouteCoords(res.coordinates);
+      } else {
+        setRouteCoords([]);
       }
     } catch (e) {
       console.warn("Route fetch error", e);
+      setRouteCoords([]);
     }
   };
 
@@ -579,10 +594,10 @@ export default function CitizenDashboard({ currentUser, onOpenSos, onLogout, ini
               zoom={14}
               incidentLocation={{ lat: activeIncident.lat, lng: activeIncident.lng }}
               incidentLabel={`${activeIncident.id} (${activeIncident.emergency_type})`}
-              responderLocation={responderLiveLoc || (activeIncident.assigned_responder ? { lat: activeIncident.assigned_responder.lat, lng: activeIncident.assigned_responder.lng } : null)}
+              responderLocation={(activeIncident.assigned_responder && activeIncident.status !== "Reported" && activeIncident.status !== "Awaiting Responder") ? (responderLiveLoc || { lat: activeIncident.assigned_responder.lat, lng: activeIncident.assigned_responder.lng }) : null}
               responderType={activeIncident.assigned_responder?.service_type || activeIncident.suggested_service}
               responderLabel={activeIncident.assigned_responder?.full_name ? `${activeIncident.assigned_responder.full_name} (Live GPS)` : "Assigned Responder"}
-              routeCoordinates={routeCoords}
+              routeCoordinates={(activeIncident.assigned_responder && activeIncident.status !== "Reported" && activeIncident.status !== "Awaiting Responder") ? routeCoords : []}
             />
 
             {/* Floating Info Pill over Map */}
