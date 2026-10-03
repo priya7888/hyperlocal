@@ -44,15 +44,15 @@ export default function LandingPage({
         
         {/* Title */}
         <div style={{ marginBottom: "28px" }}>
-          <div style={{ 
-            display: "inline-flex", 
-            alignItems: "center", 
-            gap: "6px", 
-            background: "rgba(255, 51, 75, 0.12)", 
-            color: "#ff4d67", 
-            padding: "4px 12px", 
-            borderRadius: "20px", 
-            fontSize: "0.75rem", 
+          <div style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            background: "rgba(255, 51, 75, 0.12)",
+            color: "#ff4d67",
+            padding: "4px 12px",
+            borderRadius: "20px",
+            fontSize: "0.75rem",
             fontWeight: "700",
             marginBottom: "12px",
             border: "1px solid rgba(255, 51, 75, 0.3)"

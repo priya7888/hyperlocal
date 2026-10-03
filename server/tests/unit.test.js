@@ -80,6 +80,7 @@ async function runUnitTests() {
   console.log('\n====================================================');
   console.log('ALL UNIT TESTS PASSED SUCCESSFULLY! [SUCCESS]');
   console.log('====================================================');
+  process.exit(0);
 }
 
 runUnitTests().catch((err) => {

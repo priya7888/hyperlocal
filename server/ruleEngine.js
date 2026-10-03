@@ -106,42 +106,93 @@ async function checkDuplicateIncident(emergencyType, lat, lng, timeWindowSec = 6
   return { isDuplicate: false, parentIncident: null };
 }
 
-// Rule-Based Classification and Severity Determination based on the 7 exact checklist items
-function classifyEmergencyAndSeverity(emergencyType, description = '', checklist = []) {
-  const descLower = description.toLowerCase();
-  const checklistLower = checklist.map(c => c.toLowerCase());
+// Normalization helper for responder service categories
+function normalizeResponderType(type) {
+  if (!type) return null;
+  const t = String(type).trim().toUpperCase();
+  if (t === 'POLICE' || t.includes('POLICE') || t.includes('CRIME') || t.includes('SAFETY') || t.includes('COP')) return 'POLICE';
+  if (t === 'FIRE' || t.includes('FIRE') || t.includes('SMOKE') || t.includes('TRAPPED') || t.includes('RESCUE')) return 'FIRE';
+  if (t === 'AMBULANCE' || t.includes('AMBULANCE') || t.includes('MEDIC') || t.includes('INJUR') || t.includes('UNCONSCIOUS') || t.includes('CRASH') || t.includes('ACCIDENT')) return 'AMBULANCE';
+  return t;
+}
 
-  let suggested_service = 'Ambulance';
+function mapToServiceType(normType) {
+  const norm = normalizeResponderType(normType);
+  if (norm === 'POLICE') return 'Police';
+  if (norm === 'FIRE') return 'Fire';
+  if (norm === 'AMBULANCE') return 'Ambulance';
+  return normType;
+}
+
+// Rule-Based Classification and Severity Determination supporting MULTIPLE required responder types
+function classifyEmergencyAndSeverity(emergencyType, description = '', checklist = [], explicitRequiredTypes = []) {
+  const descLower = description.toLowerCase();
+  const checklistLower = (checklist || []).map(c => String(c).toLowerCase());
+
   let severity = 'Medium';
   let reasons = [];
 
-  // Service Mapping per exact checklist items:
-  // 1. Fire or smoke -> Fire
-  // 2. Crime/personal safety threat -> Police
-  // 3. Person injured, Person unconscious, Road accident, Other emergency -> Ambulance
-  // 4. Person trapped -> Fire/Rescue
-  const hasFire = checklistLower.some(c => c.includes('fire') || c.includes('smoke')) || emergencyType === 'Fire' || descLower.includes('fire');
-  const hasCrime = checklistLower.some(c => c.includes('crime') || c.includes('safety') || c.includes('threat')) || emergencyType === 'Crime' || descLower.includes('robbery') || descLower.includes('weapon');
-  const hasTrapped = checklistLower.some(c => c.includes('trapped'));
-  const hasMedical = checklistLower.some(c => c.includes('injured') || c.includes('unconscious') || c.includes('accident') || c.includes('other')) || emergencyType === 'Medical' || emergencyType === 'Crash';
+  // Use a Set to accumulate EVERY required responder type without overwriting
+  const requiredTypesSet = new Set();
 
-  if (hasFire) {
-    suggested_service = 'Fire';
-    reasons.push('Hazard indicators match Fire Service');
-  } else if (hasCrime) {
-    suggested_service = 'Police';
+  // 1. Check explicit required types passed directly
+  if (Array.isArray(explicitRequiredTypes)) {
+    for (const t of explicitRequiredTypes) {
+      const norm = normalizeResponderType(t);
+      if (norm) requiredTypesSet.add(norm);
+    }
+  }
+
+  // 2. Check if checklist itself contains direct responder type names (Police, Ambulance, Fire)
+  for (const item of checklist || []) {
+    const norm = normalizeResponderType(item);
+    if (norm === 'POLICE' || norm === 'AMBULANCE' || norm === 'FIRE') {
+      requiredTypesSet.add(norm);
+    }
+  }
+
+  // 3. Condition Mapping based on danger checklist indicators:
+  // Fire indicators -> FIRE
+  const hasFire = checklistLower.some(c => c.includes('fire') || c.includes('smoke')) || emergencyType === 'Fire' || descLower.includes('fire');
+  const hasTrapped = checklistLower.some(c => c.includes('trapped'));
+  if (hasFire || hasTrapped) {
+    requiredTypesSet.add('FIRE');
+    reasons.push(hasTrapped ? 'Trapped victim indicators match Fire & Rescue Service' : 'Hazard indicators match Fire Service');
+  }
+
+  // Crime/Threat indicators -> POLICE
+  const hasCrime = checklistLower.some(c => c.includes('crime') || c.includes('safety') || c.includes('threat') || c.includes('police')) ||
+                   emergencyType === 'Crime' || descLower.includes('robbery') || descLower.includes('weapon') || descLower.includes('assault');
+  if (hasCrime) {
+    requiredTypesSet.add('POLICE');
     reasons.push('Threat indicators match Police Department');
-  } else if (hasTrapped) {
-    suggested_service = 'Fire';
-    reasons.push('Trapped victim indicators match Fire & Rescue Service');
-  } else {
-    suggested_service = 'Ambulance';
+  }
+
+  // Medical/Injury indicators -> AMBULANCE
+  const hasMedical = checklistLower.some(c => c.includes('injured') || c.includes('unconscious') || c.includes('accident') || c.includes('ambulance') || c.includes('other')) ||
+                     emergencyType === 'Medical' || emergencyType === 'Crash' || descLower.includes('injury') || descLower.includes('bleeding');
+  if (hasMedical) {
+    requiredTypesSet.add('AMBULANCE');
     reasons.push('Medical or injury indicators match Ambulance Emergency Service');
   }
 
+  // Emergency type fallbacks if no items matched yet
+  if (requiredTypesSet.size === 0) {
+    if (emergencyType === 'Fire') requiredTypesSet.add('FIRE');
+    else if (emergencyType === 'Crime') requiredTypesSet.add('POLICE');
+    else requiredTypesSet.add('AMBULANCE');
+  }
+
+  // Convert Set to Array preserving all selected types (e.g. ['POLICE', 'AMBULANCE'])
+  const requiredResponderTypes = Array.from(requiredTypesSet);
+
+  // Suggested service string: single service name for backward compat, or comma separated for multi
+  let suggested_service = requiredResponderTypes.length === 1
+    ? mapToServiceType(requiredResponderTypes[0])
+    : requiredResponderTypes.map(mapToServiceType).join(', ');
+
   // Severity Rules
   const hasCritical = checklistLower.some(c => c.includes('unconscious') || c.includes('trapped') || c.includes('fire') || c.includes('threat')) || descLower.includes('critical');
-
   if (hasCritical) {
     severity = 'Critical';
     reasons.push('Critical urgency priority');
@@ -151,6 +202,8 @@ function classifyEmergencyAndSeverity(emergencyType, description = '', checklist
 
   return {
     suggested_service,
+    requiredResponderTypes,
+    required_responder_types: requiredResponderTypes,
     severity,
     reason: reasons.join('; ')
   };
@@ -223,11 +276,70 @@ async function findRankedResponders(serviceType, incidentLat, incidentLng, maxRa
   return ranked;
 }
 
+/**
+ * Hyperlocal Emergency Responder Finder:
+ * Finds ALL eligible registered responders within the configured geographic radius.
+ * CRITICAL RULE: NO ARTIFICIAL LIMIT (No top 5, no max 5).
+ * Filters strictly by:
+ * 1. Registered account (exists in DB)
+ * 2. Correct service_type matching emergency requirement
+ * 3. Verified account (is_verified = 1)
+ * 4. Currently available (is_available = 1)
+ * 5. Not already assigned to another active incident (current_incident_id is NULL)
+ * 6. Valid current latitude and longitude
+ * 7. Geographically within radiusKm
+ */
+async function findEligibleNearbyResponders(serviceType, incidentLat, incidentLng, radiusKm = 5.0) {
+  if (incidentLat === null || incidentLat === undefined || isNaN(incidentLat) ||
+      incidentLng === null || incidentLng === undefined || isNaN(incidentLng)) {
+    return [];
+  }
+
+  const responders = await dbAll(
+    `SELECT r.*, u.full_name, u.phone, u.email
+     FROM responders r
+     JOIN users u ON r.user_id = u.id
+     WHERE r.service_type = ?
+       AND r.is_verified = 1
+       AND r.is_available = 1
+       AND (r.current_incident_id IS NULL OR r.current_incident_id = '')`,
+    [serviceType]
+  );
+
+  const eligible = [];
+  for (const resp of responders) {
+    // Validate responder location
+    if (resp.lat === null || resp.lat === undefined || isNaN(resp.lat) ||
+        resp.lng === null || resp.lng === undefined || isNaN(resp.lng)) {
+      continue;
+    }
+
+    const dist = calculateHaversineDistance(incidentLat, incidentLng, resp.lat, resp.lng);
+    if (dist.km <= radiusKm) {
+      const eta = estimateTravelTime(dist.km);
+      eligible.push({
+        ...resp,
+        distance_km: dist.km,
+        distance_meters: dist.meters,
+        eta_minutes: eta.minutes,
+        eta_seconds: eta.seconds
+      });
+    }
+  }
+
+  // Sort by proximity ascending, returning ALL eligible without any cap
+  eligible.sort((a, b) => a.distance_km - b.distance_km);
+  return eligible;
+}
+
 module.exports = {
   calculateHaversineDistance,
   estimateTravelTime,
   fetchOsrmRoute,
   checkDuplicateIncident,
   classifyEmergencyAndSeverity,
-  findRankedResponders
+  findRankedResponders,
+  findEligibleNearbyResponders,
+  normalizeResponderType,
+  mapToServiceType
 };

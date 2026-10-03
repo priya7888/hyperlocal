@@ -16,7 +16,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = "citizen-logi
     const validMode = initialMode === "responder-register" ? "responder-login" : initialMode;
     setMode(validMode);
     setErrorMsg("");
-    
+
     // Default demo credentials
     if (validMode === "citizen-login") {
       setEmail("citizen@demo.com");
@@ -100,9 +100,9 @@ export default function AuthModal({ isOpen, onClose, initialMode = "citizen-logi
             </h2>
           </div>
           <div style={{ fontSize: "0.82rem", color: "#94a3b8" }}>
-            {isResponder 
+            {isResponder
               ? "Official emergency responder access (Ambulance, Police, Fire)."
-              : isRegister 
+              : isRegister
               ? "Create your personal emergency profile."
               : "Sign in to view your reports and live GPS responder tracking."}
           </div>
@@ -275,10 +275,10 @@ export default function AuthModal({ isOpen, onClose, initialMode = "citizen-logi
             type="submit"
             disabled={isLoading}
             className={isResponder ? "btn-emergency-main" : "btn-primary-blue"}
-            style={{ 
-              width: "100%", 
-              padding: "12px", 
-              fontSize: "0.95rem", 
+            style={{
+              width: "100%",
+              padding: "12px",
+              fontSize: "0.95rem",
               marginTop: "8px",
               background: isResponder ? "linear-gradient(135deg, #00ff88, #059669)" : undefined,
               color: isResponder ? "#070a12" : undefined

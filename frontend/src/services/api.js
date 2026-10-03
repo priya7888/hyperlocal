@@ -32,18 +32,18 @@ const PRESET_USERS = {
   "aarav@demo.com": { id: 1, full_name: "Aarav Sharma", email: "aarav@demo.com", role: "citizen", phone: "+91 98765 43210" },
   "neha@demo.com": { id: 2, full_name: "Neha Patel", email: "neha@demo.com", role: "citizen", phone: "+91 98765 43214" },
   "rohan@demo.com": { id: 3, full_name: "Rohan Verma", email: "rohan@demo.com", role: "citizen", phone: "+91 98765 43215" },
-  
+
   "ambulance1@demo.com": { id: 10, responderId: 1, full_name: "Capt. Rajesh Kumar (EMS Alpha 108)", email: "ambulance1@demo.com", role: "responder", service_type: "Ambulance", vehicle_number: "KA-01-AMB-108", phone: "+91 98765 43221" },
   "ambulance2@demo.com": { id: 11, responderId: 2, full_name: "Paramedic Sunita Rao (EMS Bravo 104)", email: "ambulance2@demo.com", role: "responder", service_type: "Ambulance", vehicle_number: "KA-01-AMB-104", phone: "+91 98765 43222" },
   "ambulance3@demo.com": { id: 12, responderId: 3, full_name: "Dr. Vikram Seth (Trauma Unit)", email: "ambulance3@demo.com", role: "responder", service_type: "Ambulance", vehicle_number: "KA-01-AMB-999", phone: "+91 98765 43223" },
-  
+
   "police1@demo.com": { id: 20, responderId: 4, full_name: "Inspector Priya Singh (Patrol 01)", email: "police1@demo.com", role: "responder", service_type: "Police", vehicle_number: "KA-01-POL-01", phone: "+91 98765 43224" },
   "police2@demo.com": { id: 21, responderId: 5, full_name: "Officer Amit Deshmukh (Highway Patrol)", email: "police2@demo.com", role: "responder", service_type: "Police", vehicle_number: "KA-01-POL-12", phone: "+91 98765 43225" },
   "police3@demo.com": { id: 22, responderId: 6, full_name: "Sub-Inspector Kavita Joshi (PCR Van 07)", email: "police3@demo.com", role: "responder", service_type: "Police", vehicle_number: "KA-01-POL-07", phone: "+91 98765 43226" },
-  
+
   "fire1@demo.com": { id: 30, responderId: 7, full_name: "Station Officer Suresh Nair (Tender 09)", email: "fire1@demo.com", role: "responder", service_type: "Fire", vehicle_number: "KA-01-FIRE-09", phone: "+91 98765 43227" },
   "fire2@demo.com": { id: 31, responderId: 8, full_name: "Firefighter Deepak Pillai (Quick Fire 04)", email: "fire2@demo.com", role: "responder", service_type: "Fire", vehicle_number: "KA-01-FIRE-04", phone: "+91 98765 43228" },
-  
+
   "rescue1@demo.com": { id: 40, responderId: 9, full_name: "Rescue Lead Manoj Gowda (NDRF)", email: "rescue1@demo.com", role: "responder", service_type: "Rescue", vehicle_number: "KA-01-RSC-88", phone: "+91 98765 43229" },
   "admin@demo.com": { id: 50, full_name: "Chief Dispatcher Rajesh Mehra", email: "admin@demo.com", role: "admin", phone: "+91 98765 43291" }
 };
@@ -161,7 +161,7 @@ export const authApi = {
       return res.data;
     } catch (err) {
       const normalizedEmail = (email || "").trim().toLowerCase();
-      
+
       let user = null;
       try {
         const registered = JSON.parse(localStorage.getItem("registered_users") || "[]");
@@ -262,10 +262,19 @@ export const incidentApi = {
       return { success: true, data: inc, incident: inc };
     } catch (err) {
       const incidents = getStoredIncidents();
+      const reqTypes = incidentData.requiredResponderTypes || incidentData.required_responder_types ||
+        [incidentData.emergency_type === "Fire" ? "FIRE" : incidentData.emergency_type === "Crime" ? "POLICE" : "AMBULANCE"];
       const newInc = {
         id: `INC-${Math.floor(100 + Math.random() * 900)}`,
         emergency_type: incidentData.emergency_type || "Medical",
-        suggested_service: incidentData.suggested_service || (incidentData.emergency_type === "Fire" ? "Fire" : incidentData.emergency_type === "Crime" ? "Police" : "Ambulance"),
+        requiredResponderTypes: reqTypes,
+        required_responder_types: reqTypes,
+        suggested_service: reqTypes.join(', '),
+        responder_requirements: reqTypes.map(t => ({
+          responder_type: t,
+          service_type: t === 'POLICE' ? 'Police' : t === 'FIRE' ? 'Fire' : 'Ambulance',
+          status: 'SEARCHING'
+        })),
         severity: "Critical",
         description: incidentData.description || "",
         checklist_json: JSON.stringify(incidentData.checklist || []),
@@ -306,6 +315,15 @@ export const incidentApi = {
       }
     } catch (e) {}
     return getStoredIncidents();
+  },
+
+  getRequests: async (id) => {
+    try {
+      const res = await api.get(`/incidents/${id}/requests`);
+      return res.data;
+    } catch (e) {
+      return [];
+    }
   },
 
   assign: async (id, action, lat, lng) => {

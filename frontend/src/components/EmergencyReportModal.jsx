@@ -99,8 +99,22 @@ export default function EmergencyReportModal({ isOpen, onClose, onSuccess }) {
       else if (emergencyType.includes("Road")) mappedType = "Crash";
       else if (emergencyType.includes("Hazard") || emergencyType.includes("Flood")) mappedType = "Flood";
 
+      const requiredTypes = new Set();
+      if (emergencyType.includes("Fire")) requiredTypes.add("FIRE");
+      if (emergencyType.includes("Crime")) requiredTypes.add("POLICE");
+      if (emergencyType.includes("Medical") || emergencyType.includes("Road")) requiredTypes.add("AMBULANCE");
+      checklist.forEach(c => {
+        const cl = c.toLowerCase();
+        if (cl.includes("fire") || cl.includes("smoke") || cl.includes("trapped")) requiredTypes.add("FIRE");
+        if (cl.includes("danger") || cl.includes("violence") || cl.includes("crime")) requiredTypes.add("POLICE");
+        if (cl.includes("injur") || cl.includes("unconscious") || cl.includes("accident")) requiredTypes.add("AMBULANCE");
+      });
+      if (requiredTypes.size === 0) requiredTypes.add("AMBULANCE");
+
       const payload = {
         emergency_type: mappedType,
+        requiredResponderTypes: Array.from(requiredTypes),
+        required_responder_types: Array.from(requiredTypes),
         description: description.trim() || `Reported via SOS Checklist: ${checklist.join(', ')}`, // Optional fallback
         voice_transcript: voiceOriginal || null,
         checklist,
@@ -144,7 +158,7 @@ export default function EmergencyReportModal({ isOpen, onClose, onSuccess }) {
               Emergency SOS Dispatched!
             </h3>
             <p style={{ color: "#64748b", fontSize: "0.95rem", marginBottom: "20px" }}>
-              Alert broadcasted to the <strong>nearest 5 online {createdIncident.suggested_service || "Emergency"} services</strong> with a 5-minute accept window.
+              Alert broadcasted to <strong>all eligible nearby {createdIncident.suggested_service || "Emergency"} responders</strong> within configured radius. First acceptance wins.
             </p>
 
             <div className="story-card" style={{ maxWidth: "420px", margin: "0 auto 24px auto", padding: "20px", textAlign: "left", background: "#f8fafc" }}>

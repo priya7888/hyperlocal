@@ -969,11 +969,8 @@ function Screen8ResponderDashboard() {
                 {n.type}
               </div>
               <div style={{ display: "flex", gap: "6px" }}>
-                <button style={{ flex: 1, padding: "4px", background: "#ef4444", color: "white", border: "none", borderRadius: "4px", fontSize: "0.72rem", fontWeight: "700", cursor: "pointer" }}>
+                <button style={{ flex: 1, padding: "6px", background: "#ef4444", color: "white", border: "none", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "700", cursor: "pointer" }}>
                   Accept
-                </button>
-                <button style={{ flex: 1, padding: "4px", background: "#ffffff", color: "#475569", border: "1px solid #cbd5e1", borderRadius: "4px", fontSize: "0.72rem", fontWeight: "600", cursor: "pointer" }}>
-                  Reject
                 </button>
               </div>
             </div>
