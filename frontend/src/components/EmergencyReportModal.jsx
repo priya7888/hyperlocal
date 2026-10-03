@@ -4,8 +4,7 @@ import {
   Mic, MapPin, Navigation, CheckSquare, Square, X, ArrowRight,
   CheckCircle2, RefreshCw, Volume2, Globe, Check, AlertCircle
 } from "lucide-react";
-import MapComponent from "./MapComponent";
-import { incidentApi, getDeviceLocation } from "../services/api";
+import { incidentApi, getDeviceLocation, reverseGeocode } from "../services/api";
 
 const EMERGENCY_TYPES = [
   { id: "Medical Emergency", label: "Medical Emergency", icon: HeartPulse, color: "#2563eb", service: "Ambulance" },
@@ -59,10 +58,11 @@ export default function EmergencyReportModal({ isOpen, onClose, onSuccess }) {
 
   const handleAutoDetectLocation = async () => {
     setIsLocating(true);
-    const loc = await getDeviceLocation(17.5800, 78.4867);
+    const loc = await getDeviceLocation(coords.lat || 17.5800, coords.lng || 78.4867);
     setCoords({ lat: loc.lat, lng: loc.lng });
     setAccuracyMeters(loc.accuracy || 12);
-    setAddressText("Current Device Location Verified & Locked");
+    const street = await reverseGeocode(loc.lat, loc.lng);
+    setAddressText(street || "Verified Live Device GPS Location");
     setIsLocating(false);
   };
 
@@ -314,60 +314,71 @@ export default function EmergencyReportModal({ isOpen, onClose, onSuccess }) {
               />
             </div>
 
-            {/* 4. Automatic GPS Location Detection */}
+            {/* 4. Automatic GPS Location Detection (No Clumsy Pinning) */}
             <div style={{ marginBottom: "22px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                 <label style={{ fontSize: "0.85rem", fontWeight: "700", color: "#334155", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <MapPin size={16} color="#ef4444" /> 4. Detected GPS Incident Location
+                  <MapPin size={16} color="#ef4444" /> 4. Incident Location (Auto-Locked)
                 </label>
                 <button
                   type="button"
                   onClick={handleAutoDetectLocation}
-                  style={{ background: "transparent", border: "none", color: "#2563eb", fontSize: "0.8rem", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+                  style={{
+                    background: "#eff6ff",
+                    border: "1px solid #bfdbfe",
+                    borderRadius: "6px",
+                    padding: "4px 8px",
+                    color: "#2563eb",
+                    fontSize: "0.78rem",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
                 >
-                  <Navigation size={12} className={isLocating ? "animate-spin" : ""} />
-                  {isLocating ? "Locating..." : "Refresh GPS"}
+                  <RefreshCw size={12} className={isLocating ? "animate-spin" : ""} />
+                  {isLocating ? "Locating..." : "Recalibrate GPS"}
                 </button>
               </div>
 
-              <div style={{ height: "180px", borderRadius: "10px", overflow: "hidden", marginBottom: "8px", position: "relative" }}>
-                <div style={{
-                  position: "absolute",
-                  top: "8px",
-                  left: "8px",
-                  zIndex: 999,
-                  background: "rgba(15, 23, 42, 0.85)",
-                  color: "#38bdf8",
-                  padding: "3px 8px",
-                  borderRadius: "6px",
-                  fontSize: "0.7rem",
-                  fontWeight: "700",
-                  pointerEvents: "none"
-                }}>
-                  📍 Drag 🎯 pin or click to set custom location
+              <div style={{
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: "10px",
+                padding: "12px 14px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ color: isLocating ? "#eab308" : "#16a34a", fontSize: "0.85rem", fontWeight: "900" }}>
+                    {isLocating ? "⏳" : "●"}
+                  </span>
+                  <div style={{ fontSize: "0.85rem", color: "#0f172a", fontWeight: "600", flex: 1 }}>
+                    {addressText}
+                  </div>
                 </div>
-                <MapComponent
-                  height="180px"
-                  center={[coords.lat, coords.lng]}
-                  pickerMode={true}
-                  pickerCoords={coords}
-                  onPickerCoordsChange={(lat, lng) => {
-                    const cleanLat = parseFloat(lat.toFixed(5));
-                    const cleanLng = parseFloat(lng.toFixed(5));
-                    setCoords({ lat: cleanLat, lng: cleanLng });
-                    setAddressText("Custom Incident Location (Pinned on Map)");
-                    localStorage.setItem("last_device_gps_lat", cleanLat.toString());
-                    localStorage.setItem("last_device_gps_lng", cleanLng.toString());
+
+                <input
+                  type="text"
+                  placeholder="Building / Floor / Room / Gate Landmark (Optional)"
+                  onChange={(e) => {
+                    const extra = e.target.value.trim();
+                    if (extra) {
+                      setAddressText(`${addressText.split(' (')[0]} (${extra})`);
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "0.8rem",
+                    background: "#ffffff"
                   }}
                 />
               </div>
-
-              <input
-                type="text"
-                value={addressText}
-                onChange={(e) => setAddressText(e.target.value)}
-                style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.82rem", background: "#f8fafc" }}
-              />
             </div>
 
             {/* Voice Input Submodal Modal */}

@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { 
   AlertOctagon, X, MapPin, Navigation, CheckSquare, Square, 
-  AlertCircle, CheckCircle2, ArrowRight, Shield, Flame, HeartPulse, Activity,
-  Map, ChevronDown, ChevronUp
+  AlertCircle, Shield, Flame, HeartPulse, Activity, RefreshCw
 } from "lucide-react";
-import MapComponent from "./MapComponent";
-import { incidentApi, getDeviceLocation } from "../services/api";
+import { incidentApi, getDeviceLocation, reverseGeocode } from "../services/api";
 import { sounds } from "../services/soundEffects";
 
 const EXACT_CHECKLIST = [
@@ -21,10 +19,11 @@ const EXACT_CHECKLIST = [
 export default function SosModal({ isOpen, onClose, onSubmitted }) {
   const [checklist, setChecklist] = useState([]);
   const [description, setDescription] = useState("");
+  const [landmark, setLandmark] = useState("");
   const [checklistError, setChecklistError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
-  const [showMapPicker, setShowMapPicker] = useState(true);
+  const [addressText, setAddressText] = useState("Detecting live location via satellite GPS...");
   const [coords, setCoords] = useState(() => {
     const savedLat = parseFloat(localStorage.getItem("last_device_gps_lat"));
     const savedLng = parseFloat(localStorage.getItem("last_device_gps_lng"));
@@ -35,8 +34,8 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
     if (isOpen) {
       setChecklist([]);
       setDescription("");
+      setLandmark("");
       setChecklistError("");
-      setShowMapPicker(true);
       handleDetectLocation();
     }
   }, [isOpen]);
@@ -46,6 +45,10 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
     setIsLocating(true);
     const loc = await getDeviceLocation(coords.lat || 17.5800, coords.lng || 78.4867);
     setCoords({ lat: loc.lat, lng: loc.lng });
+    
+    // Automatically reverse geocode to human-readable address
+    const street = await reverseGeocode(loc.lat, loc.lng);
+    setAddressText(street || "Verified Emergency Scene Location");
     sounds.playStep();
     setIsLocating(false);
   };
@@ -112,14 +115,20 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
         suggested_service = "All";
       }
 
+      const fullDesc = [
+        description.trim() ? description.trim() : null,
+        `Conditions: ${checklist.join(', ')}`,
+        landmark.trim() ? `Landmark: ${landmark.trim()}` : null
+      ].filter(Boolean).join(' • ');
+
       const payload = {
         emergency_type: type,
         suggested_service: suggested_service,
-        description: description.trim() || `Reported Conditions: ${checklist.join(', ')}`,
+        description: fullDesc,
         checklist,
         lat: Number(coords.lat) || 17.5800,
         lng: Number(coords.lng) || 78.4867,
-        address: "Verified Emergency Scene Location"
+        address: addressText + (landmark.trim() ? ` (${landmark.trim()})` : '')
       };
 
       const res = await incidentApi.create(payload);
@@ -138,47 +147,75 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-container" style={{ maxWidth: "580px", padding: "24px", background: "#0e1424", border: "1px solid rgba(255,51,75,0.4)" }}>
+      <div className="modal-container" style={{
+        maxWidth: "540px",
+        padding: "24px",
+        background: "linear-gradient(180deg, #111827 0%, #0b0f19 100%)",
+        border: "1.5px solid rgba(255, 51, 75, 0.4)",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.85), 0 0 40px rgba(255,51,75,0.25)"
+      }}>
         
-        {/* Close Button */}
-        <button
-          onClick={() => { sounds.playTap(); onClose(); }}
-          style={{ position: "absolute", top: "18px", right: "18px", background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
-        >
-          <X size={20} />
-        </button>
-
-        {/* Modal Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
-          <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#ff334b", color: "white", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 16px rgba(255,51,75,0.4)" }}>
-            <AlertOctagon size={22} />
+        {/* Header with Close */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "10px",
+              background: "rgba(255, 51, 75, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid #ff334b"
+            }}>
+              <AlertOctagon size={24} color="#ff334b" />
+            </div>
+            <div>
+              <h2 style={{ fontSize: "1.2rem", fontWeight: "900", color: "#f8fafc", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Emergency SOS Dispatch
+              </h2>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                Zero-Click Instant Satellite Location Broadcast
+              </div>
+            </div>
           </div>
-          <div>
-            <h2 style={{ fontSize: "1.3rem", fontWeight: "900", color: "#f8fafc", margin: 0 }}>
-              Emergency SOS Report
-            </h2>
-          </div>
+          <button 
+            onClick={() => { sounds.playTap(); onClose(); }}
+            style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
+          >
+            <X size={20} />
+          </button>
         </div>
-        <p style={{ color: "#94a3b8", fontSize: "0.82rem", marginBottom: "14px" }}>
-          Select all conditions that apply. Checklist is <strong>mandatory</strong>.
-        </p>
 
-        {/* Dynamic Live Triage Badge */}
-        <div style={{ 
-          display: "flex", 
-          alignItems: "center", 
-          justifyContent: "space-between", 
-          padding: "8px 12px", 
-          borderRadius: "8px", 
-          background: "rgba(15, 23, 42, 0.7)", 
-          border: `1px solid ${currentService.color}40`,
-          marginBottom: "14px" 
+        {/* Dynamic Service Alert Banner */}
+        <div style={{
+          background: `rgba(15, 23, 42, 0.8)`,
+          border: `1.5px solid ${currentService.color}40`,
+          borderRadius: "12px",
+          padding: "12px 14px",
+          marginBottom: "16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.82rem", color: currentService.color, fontWeight: "700" }}>
-            {currentService.icon}
-            <span>Target Dispatch: {currentService.name}</span>
+          <div>
+            <div style={{ fontSize: "0.72rem", color: "#94a3b8", textTransform: "uppercase", fontWeight: "700" }}>
+              Auto-Dispatched Unit:
+            </div>
+            <div style={{ fontSize: "1rem", fontWeight: "900", color: currentService.color, display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+              {currentService.icon}
+              <span>{currentService.name}</span>
+            </div>
           </div>
-          <div style={{ fontSize: "0.72rem", color: severityScore > 2 ? "#ff334b" : severityScore > 0 ? "#f59e0b" : "#64748b", fontWeight: "800", textTransform: "uppercase" }}>
+          <div style={{
+            background: severityScore > 0 ? "rgba(255, 51, 75, 0.15)" : "rgba(255, 255, 255, 0.05)",
+            border: severityScore > 0 ? "1px solid #ff334b" : "1px solid rgba(255,255,255,0.1)",
+            padding: "4px 10px",
+            borderRadius: "20px",
+            fontSize: "0.72rem",
+            fontWeight: "800",
+            color: severityScore > 0 ? "#ff4d67" : "#94a3b8"
+          }}>
             {severityLabel}
           </div>
         </div>
@@ -232,101 +269,93 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
             </div>
           </div>
 
-          {/* 2. Optional Description */}
+          {/* 2. 100% Automated Satellite GPS Location Card (No Clumsy Pinning Required) */}
+          <div style={{
+            background: "rgba(30, 41, 59, 0.6)",
+            border: "1px solid rgba(0, 229, 255, 0.35)",
+            borderRadius: "12px",
+            padding: "12px 14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <MapPin size={16} color="#00e5ff" />
+                <span style={{ fontSize: "0.82rem", fontWeight: "800", color: "#00e5ff" }}>
+                  2. Incident GPS Location (Auto-Locked)
+                </span>
+              </div>
+              
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                style={{
+                  background: "rgba(0, 229, 255, 0.15)",
+                  border: "1px solid rgba(0, 229, 255, 0.5)",
+                  color: "#00e5ff",
+                  borderRadius: "6px",
+                  padding: "4px 8px",
+                  fontSize: "0.72rem",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px"
+                }}
+              >
+                <RefreshCw size={11} className={isLocating ? "animate-spin" : ""} />
+                {isLocating ? "Locating..." : "Recalibrate GPS"}
+              </button>
+            </div>
+
+            <div style={{
+              background: "rgba(15, 23, 42, 0.8)",
+              padding: "8px 10px",
+              borderRadius: "8px",
+              border: "1px solid rgba(255,255,255,0.06)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px"
+            }}>
+              <span style={{ color: isLocating ? "#eab308" : "#00ff88", fontSize: "0.8rem", fontWeight: "900" }}>
+                {isLocating ? "⏳" : "●"}
+              </span>
+              <div style={{ fontSize: "0.8rem", color: "#f8fafc", fontWeight: "600", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {addressText}
+              </div>
+            </div>
+
+            {/* Optional Landmark / Gate input for indoor/visitors */}
+            <input
+              type="text"
+              value={landmark}
+              onChange={(e) => setLandmark(e.target.value)}
+              placeholder="Landmark / Floor / Gate / Building Name (Optional)"
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: "8px",
+                background: "rgba(15, 23, 42, 0.8)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                color: "#f8fafc",
+                fontSize: "0.8rem"
+              }}
+            />
+          </div>
+
+          {/* 3. Optional Extra Description */}
           <div>
-            <label style={{ fontSize: "0.82rem", fontWeight: "700", color: "#94a3b8", display: "block", marginBottom: "4px" }}>
-              2. Emergency Description <span style={{ color: "#64748b", fontWeight: "400" }}>(Optional)</span>
+            <label style={{ fontSize: "0.8rem", fontWeight: "700", color: "#94a3b8", display: "block", marginBottom: "4px" }}>
+              3. Extra Notes <span style={{ color: "#64748b", fontWeight: "400" }}>(Optional)</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe what happened, landmarks... (Optional)"
+              placeholder="Any additional details for the arriving team... (Optional)"
               rows={2}
-              style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", background: "rgba(30,41,59,0.7)", border: "1px solid rgba(255,255,255,0.15)", color: "#f8fafc", fontSize: "0.85rem" }}
+              style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", background: "rgba(30,41,59,0.7)", border: "1px solid rgba(255,255,255,0.15)", color: "#f8fafc", fontSize: "0.82rem" }}
             />
-          </div>
-
-          {/* 3. Clean Automatic GPS Detection with 'Open Map' Button */}
-          {/* 3. Clean GPS Detection & Interactive Draggable Map Pin */}
-          <div>
-            <div style={{ 
-              background: "rgba(30, 41, 59, 0.5)", 
-              border: "1px solid rgba(56, 189, 248, 0.25)", 
-              borderRadius: "10px", 
-              padding: "10px 12px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "8px",
-              marginBottom: "8px"
-            }}>
-              <div>
-                <div style={{ fontSize: "0.82rem", fontWeight: "800", color: "#00e5ff", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <MapPin size={15} color="#00e5ff" />
-                  <span>3. Incident Location Pin</span>
-                </div>
-                <div style={{ fontSize: "0.76rem", color: "#00ff88", marginTop: "2px", fontWeight: "700" }}>
-                  ● Position Verified & Locked
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button
-                  type="button"
-                  onClick={handleDetectLocation}
-                  style={{ background: "rgba(0, 229, 255, 0.12)", border: "1px solid rgba(0,229,255,0.4)", borderRadius: "6px", color: "#00e5ff", fontSize: "0.75rem", fontWeight: "700", padding: "5px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
-                >
-                  <Navigation size={12} className={isLocating ? "animate-spin" : ""} />
-                  {isLocating ? "Locating..." : "Auto-GPS"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowMapPicker(!showMapPicker)}
-                  style={{ background: showMapPicker ? "rgba(0, 229, 255, 0.25)" : "rgba(255, 255, 255, 0.08)", border: "1px solid rgba(0, 229, 255, 0.5)", borderRadius: "6px", color: "#00e5ff", fontSize: "0.75rem", fontWeight: "700", padding: "5px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
-                >
-                  <Map size={12} />
-                  {showMapPicker ? "Pin Active" : "Pick on Map"}
-                </button>
-              </div>
-            </div>
-
-            {/* Interactive Draggable Pin Map Canvas */}
-            {showMapPicker && (
-              <div style={{ borderRadius: "10px", overflow: "hidden", border: "1.5px solid rgba(0, 229, 255, 0.5)", position: "relative", animation: "fadeIn 0.2s ease" }}>
-                <div style={{
-                  position: "absolute",
-                  top: "8px",
-                  left: "8px",
-                  zIndex: 999,
-                  background: "rgba(14, 20, 36, 0.9)",
-                  border: "1px solid rgba(0, 229, 255, 0.3)",
-                  borderRadius: "6px",
-                  padding: "3px 8px",
-                  fontSize: "0.7rem",
-                  fontWeight: "700",
-                  color: "#00e5ff",
-                  pointerEvents: "none"
-                }}>
-                  📍 Tap map or drag 🎯 pin to set location
-                </div>
-
-                <MapComponent
-                  height="170px"
-                  center={[coords.lat, coords.lng]}
-                  pickerMode={true}
-                  pickerCoords={coords}
-                  onPickerCoordsChange={(lat, lng) => {
-                    const cleanLat = parseFloat(lat.toFixed(5));
-                    const cleanLng = parseFloat(lng.toFixed(5));
-                    setCoords({ lat: cleanLat, lng: cleanLng });
-                    localStorage.setItem("last_device_gps_lat", cleanLat.toString());
-                    localStorage.setItem("last_device_gps_lng", cleanLng.toString());
-                  }}
-                />
-              </div>
-            )}
           </div>
 
           {/* Actions */}
