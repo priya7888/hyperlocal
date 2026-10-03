@@ -1129,25 +1129,6 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
                     Complete & Resolve Emergency
                   </button>
                 </div>
-
-                {/* Pure Physical GPS Stream Active Status Badge */}
-                <div style={{
-                  marginTop: "8px",
-                  background: "rgba(0, 229, 255, 0.12)",
-                  border: "1px solid rgba(0, 229, 255, 0.4)",
-                  color: "#00e5ff",
-                  borderRadius: "8px",
-                  padding: "10px 14px",
-                  fontSize: "0.8rem",
-                  fontWeight: "800",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px"
-                }}>
-                  <Navigation size={15} color="#00ff88" style={{ animation: "pulse 1.5s infinite" }} />
-                  <span>📡 Live Physical GPS Active • Updates as you travel</span>
-                </div>
               </div>
 
             </div>
