@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 
 const { initDB, dbRun, dbGet, dbAll } = require('./db');
 const seedDatabase = require('./seed');
@@ -281,15 +282,52 @@ app.post('/api/incidents', authenticateToken, async (req, res) => {
     description = '',
     voice_transcript = null,
     checklist = [],
-    lat,
-    lng,
+    lat: bodyLat,
+    lng: bodyLng,
+    latitude: bodyLatitude,
+    longitude: bodyLongitude,
+    incidentLatitude,
+    incidentLongitude,
+    location_accuracy,
+    locationAccuracy,
+    accuracy,
+    location_captured_at,
+    locationCapturedAt,
+    capturedAt,
     address = 'GPS Location',
     photo_url = null
   } = req.body;
 
-  if (!lat || !lng) {
-    return res.status(400).json({ error: 'Latitude and Longitude are required' });
+  if (!emergency_type || (typeof emergency_type === 'string' && !emergency_type.trim())) {
+    return res.status(400).json({ error: 'Incident type is required' });
   }
+
+  if (!description || (typeof description === 'string' && !description.trim())) {
+    return res.status(400).json({ error: 'Description is required' });
+  }
+
+  // Resolve latitude & longitude from standard or alias properties
+  const rawLat = bodyLat ?? bodyLatitude ?? incidentLatitude;
+  const rawLng = bodyLng ?? bodyLongitude ?? incidentLongitude;
+
+  if (rawLat === undefined || rawLat === null || rawLng === undefined || rawLng === null) {
+    return res.status(400).json({ error: 'Valid incident latitude and longitude are required' });
+  }
+
+  const lat = parseFloat(rawLat);
+  const lng = parseFloat(rawLng);
+
+  // Validate coordinate boundaries: lat -90 to 90, lng -180 to 180
+  if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return res.status(400).json({
+      error: 'Invalid coordinates. Latitude must be between -90 and 90, and Longitude between -180 and 180.'
+    });
+  }
+
+  const resolvedAccuracy = (location_accuracy ?? locationAccuracy ?? accuracy != null)
+    ? parseFloat(location_accuracy ?? locationAccuracy ?? accuracy)
+    : null;
+  const resolvedCapturedAt = location_captured_at ?? locationCapturedAt ?? capturedAt ?? new Date().toISOString();
 
   try {
     // 1. Check for duplicate incident within 200m and 10 mins
@@ -313,15 +351,15 @@ app.post('/api/incidents', authenticateToken, async (req, res) => {
       `INSERT INTO incidents (
         id, citizen_id, citizen_name, citizen_phone, emergency_type, severity, 
         suggested_service, description, voice_transcript, checklist_json, photo_url,
-        lat, lng, address, status, merged_into_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        lat, lng, address, location_accuracy, location_captured_at, status, merged_into_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         incidentId,
         req.user.id || null,
         req.user.full_name,
         req.user.phone || '+91 98765 43210',
         emergency_type,
-        classification.severity,
+        req.body.severity || classification.severity,
         classification.suggested_service,
         description,
         voice_transcript,
@@ -330,6 +368,8 @@ app.post('/api/incidents', authenticateToken, async (req, res) => {
         lat,
         lng,
         address,
+        resolvedAccuracy,
+        resolvedCapturedAt,
         initialStatus,
         mergedInto
       ]
@@ -637,6 +677,52 @@ app.get('/api/route', async (req, res) => {
   const { start_lat, start_lng, end_lat, end_lng } = req.query;
   const route = await fetchOsrmRoute(parseFloat(start_lat), parseFloat(start_lng), parseFloat(end_lat), parseFloat(end_lng));
   res.json(route);
+});
+
+// Reverse Geocoding Endpoint
+app.get('/api/geocode/reverse', async (req, res) => {
+  const { lat, lng, latitude, longitude } = req.query;
+  const targetLat = parseFloat(lat ?? latitude);
+  const targetLng = parseFloat(lng ?? longitude);
+
+  if (isNaN(targetLat) || isNaN(targetLng) || targetLat < -90 || targetLat > 90 || targetLng < -180 || targetLng > 180) {
+    return res.status(400).json({ error: 'Invalid coordinates for reverse geocoding' });
+  }
+
+  try {
+    const response = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${targetLat}&lon=${targetLng}&zoom=18&addressdetails=1`,
+      {
+        headers: {
+          'User-Agent': 'HyperlocalEmergencyResponsePlatform/1.0 (Emergency Coordination Service; contact: support@demo.emergency)'
+        },
+        timeout: 4500
+      }
+    );
+
+    if (response.data && response.data.display_name) {
+      return res.json({
+        success: true,
+        address: response.data.display_name,
+        details: response.data.address || {},
+        lat: targetLat,
+        lng: targetLng
+      });
+    }
+  } catch (err) {
+    // Graceful fallback if OpenStreetMap reverse geocode times out or is offline
+    console.warn("Reverse geocode external request failed:", err.message);
+  }
+
+  // Graceful fallback to readable coordinates
+  return res.json({
+    success: true,
+    address: `Incident Pin: Lat ${targetLat.toFixed(5)}, Lng ${targetLng.toFixed(5)}`,
+    details: {},
+    lat: targetLat,
+    lng: targetLng,
+    fallback: true
+  });
 });
 
 // Emergency Contacts

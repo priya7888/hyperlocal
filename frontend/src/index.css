@@ -271,6 +271,40 @@ code, .font-mono {
   filter: brightness(0.65) invert(1) contrast(3) hue-rotate(200deg) saturate(0.35) brightness(0.75);
 }
 
+/* Tactical Compact Incident Marker Popup */
+.tactical-popup .leaflet-popup-content-wrapper {
+  background: rgba(14, 20, 36, 0.96) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(56, 189, 248, 0.35);
+  border-radius: 12px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), 0 0 16px rgba(0, 229, 255, 0.12);
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.tactical-popup .leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.35 !important;
+  width: auto !important;
+}
+
+.tactical-popup .leaflet-popup-tip {
+  background: rgba(14, 20, 36, 0.96) !important;
+  border: 1.5px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.tactical-popup a.leaflet-popup-close-button {
+  display: none !important;
+}
+
+@media (max-width: 480px) {
+  .tactical-popup .leaflet-popup-content-wrapper {
+    max-width: 290px !important;
+  }
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
@@ -288,4 +322,18 @@ code, .font-mono {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
+}
+
+/* Citizen Emergency Dashboard Responsive Operations Grid */
+.citizen-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 350px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .citizen-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
 }

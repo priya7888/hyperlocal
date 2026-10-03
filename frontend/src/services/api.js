@@ -197,6 +197,24 @@ export const routingApi = {
   }
 };
 
+// Reverse Geocoding API
+export const geocodingApi = {
+  reverse: async (lat, lng) => {
+    try {
+      const res = await api.get(`/geocode/reverse?lat=${lat}&lng=${lng}`);
+      return res.data;
+    } catch (e) {
+      return {
+        success: true,
+        address: `Lat: ${parseFloat(lat).toFixed(5)}, Lng: ${parseFloat(lng).toFixed(5)}`,
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        fallback: true
+      };
+    }
+  }
+};
+
 // Contacts API
 export const contactsApi = {
   fetchAndCache: async () => {

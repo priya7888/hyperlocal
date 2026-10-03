@@ -208,7 +208,12 @@ def format_incident(inc: models.Incident, current_responder_profile: Optional[mo
         "checklist": inc.checklist or [],
         "latitude": inc.latitude,
         "longitude": inc.longitude,
+        "lat": inc.latitude,
+        "lng": inc.longitude,
         "address_text": inc.address_text,
+        "address": inc.address_text,
+        "location_accuracy": inc.location_accuracy,
+        "location_captured_at": inc.location_captured_at,
         "status": inc.status,
         "assigned_responder_id": inc.assigned_responder_id,
         "assigned_responder": assigned_summary,
@@ -235,6 +240,19 @@ def create_incident(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Coordinate resolution & validation
+    raw_lat = inc_in.latitude if inc_in.latitude is not None else (inc_in.lat if inc_in.lat is not None else inc_in.incidentLatitude)
+    raw_lng = inc_in.longitude if inc_in.longitude is not None else (inc_in.lng if inc_in.lng is not None else inc_in.incidentLongitude)
+
+    if raw_lat is None or raw_lng is None:
+        raise HTTPException(status_code=400, detail="Valid incident latitude and longitude are required")
+    if raw_lat < -90 or raw_lat > 90 or raw_lng < -180 or raw_lng > 180:
+        raise HTTPException(status_code=400, detail="Invalid coordinates. Latitude must be between -90 and 90, Longitude between -180 and 180")
+
+    address = inc_in.address or inc_in.address_text or "Location verified via coordinates"
+    accuracy = inc_in.location_accuracy if inc_in.location_accuracy is not None else inc_in.locationAccuracy
+    captured_at = inc_in.location_captured_at or inc_in.locationCapturedAt or datetime.utcnow()
+
     # Rule engine classification
     suggested_type, urgency, rule_reason = classify_emergency(
         inc_in.emergency_type,
@@ -256,9 +274,11 @@ def create_incident(
         description=inc_in.description,
         original_voice_transcript=inc_in.original_voice_transcript,
         checklist=inc_in.checklist,
-        latitude=inc_in.latitude,
-        longitude=inc_in.longitude,
-        address_text=inc_in.address_text or "Location verified via coordinates",
+        latitude=raw_lat,
+        longitude=raw_lng,
+        address_text=address,
+        location_accuracy=accuracy,
+        location_captured_at=captured_at,
         status="Reported"
     )
     db.add(incident)
@@ -498,6 +518,24 @@ async def get_route(
 ):
     route_data = await fetch_osrm_route(start_lat, start_lng, end_lat, end_lng)
     return route_data
+
+# ================= REVERSE GEOCODING =================
+
+@app.get("/api/geocode/reverse")
+def reverse_geocode(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180)
+):
+    import urllib.request
+    import json
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lng}&zoom=18&addressdetails=1"
+        req = urllib.request.Request(url, headers={'User-Agent': 'HyperlocalEmergencyResponsePlatform/1.0'})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            return {"success": True, "address": data.get("display_name", f"Lat: {lat:.5f}, Lng: {lng:.5f}"), "lat": lat, "lng": lng}
+    except Exception:
+        return {"success": True, "address": f"Incident Pin: Lat {lat:.5f}, Lng {lng:.5f}", "lat": lat, "lng": lng, "fallback": True}
 
 # ================= EMERGENCY CONTACTS (OFFLINE READY) =================
 

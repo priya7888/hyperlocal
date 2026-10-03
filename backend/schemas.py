@@ -35,8 +35,17 @@ class IncidentCreate(BaseModel):
     emergency_type: str  # "Medical", "Road Accident", "Fire", "Crime/Personal Safety", "Other"
     description: str
     checklist: List[str] = []
-    latitude: float
-    longitude: float
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    incidentLatitude: Optional[float] = None
+    incidentLongitude: Optional[float] = None
+    location_accuracy: Optional[float] = None
+    locationAccuracy: Optional[float] = None
+    location_captured_at: Optional[datetime] = None
+    locationCapturedAt: Optional[datetime] = None
+    address: Optional[str] = None
     address_text: Optional[str] = None
     original_voice_transcript: Optional[str] = None
 
@@ -90,7 +99,12 @@ class IncidentOut(BaseModel):
     checklist: List[str]
     latitude: float
     longitude: float
-    address_text: Optional[str]
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    address_text: Optional[str] = None
+    address: Optional[str] = None
+    location_accuracy: Optional[float] = None
+    location_captured_at: Optional[datetime] = None
     status: str
     assigned_responder_id: Optional[int]
     assigned_responder: Optional[ResponderSummary] = None

@@ -4,6 +4,7 @@ import {
   MapPin, Clock, Search, RefreshCw, Download, Send, AlertTriangle, Filter
 } from "lucide-react";
 import MapComponent from "./MapComponent";
+import IncidentMonitoringMap from "./IncidentMonitoringMap";
 import { analyticsApi, incidentApi, responderApi, alertApi, socket } from "../services/api";
 
 export default function AdminDashboard({ currentUser }) {
@@ -96,6 +97,24 @@ export default function AdminDashboard({ currentUser }) {
     title: r.full_name,
     subtitle: `${r.organization_name} • Vehicle: ${r.vehicle_number || 'N/A'}`
   }));
+
+  const incidentMarkers = incidents
+    .filter(i => i.lat != null && i.lng != null && !isNaN(Number(i.lat)) && !isNaN(Number(i.lng)))
+    .map(i => ({
+      lat: Number(i.lat),
+      lng: Number(i.lng),
+      type: "incident",
+      label: `🚨 ${i.emergency_type}: ${i.id}`,
+      title: `🚨 ${i.emergency_type} Emergency`,
+      incidentId: i.id,
+      severity: i.severity || "Critical",
+      status: i.status,
+      address: i.address || `Lat ${Number(i.lat).toFixed(5)}, Lng ${Number(i.lng).toFixed(5)}`,
+      createdAt: i.created_at,
+      subtitle: `ID: ${i.id} • Status: ${i.status} • Location: ${i.address || `Lat ${Number(i.lat).toFixed(4)}, Lng ${Number(i.lng).toFixed(4)}`}`
+    }));
+
+  const allMapMarkers = [...responderMarkers, ...incidentMarkers];
 
   const totalCount = stats?.totalIncidents || incidents.length || 5;
   const ongoingCount = stats?.activeIncidents || incidents.filter(i => i.status !== "Resolved").length || 3;
@@ -264,20 +283,13 @@ export default function AdminDashboard({ currentUser }) {
         </div>
       </div>
 
-      {/* City-Wide Fleet Heatmap */}
+      {/* City-Wide Fleet Heatmap & Live Monitoring Map */}
       <div className="story-card" style={{ padding: "20px" }}>
         <h3 style={{ fontSize: "1.1rem", fontWeight: "800", color: "#0f172a", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
           <Radio size={18} color="#2563eb" />
-          Live City-Wide Fleet & Incidents Heatmap
+          Live City-Wide Fleet & Incidents Monitoring Map
         </h3>
-        <div style={{ height: "340px", borderRadius: "10px", overflow: "hidden", border: "1px solid #cbd5e1" }}>
-          <MapComponent
-            height="340px"
-            center={[17.5800, 78.4867]}
-            zoom={13}
-            additionalMarkers={responderMarkers}
-          />
-        </div>
+        <IncidentMonitoringMap height="420px" />
       </div>
 
       {/* Broadcast Modal */}

@@ -82,6 +82,8 @@ async function initDB() {
       lat REAL NOT NULL,
       lng REAL NOT NULL,
       address TEXT,
+      location_accuracy REAL,
+      location_captured_at DATETIME,
       status TEXT DEFAULT 'Reported', -- 'Reported', 'Assigned', 'En Route', 'On Scene', 'Resolved', 'Merged', 'Cancelled'
       assigned_responder_id INTEGER,
       merged_into_id TEXT,
@@ -94,6 +96,18 @@ async function initDB() {
       FOREIGN KEY (assigned_responder_id) REFERENCES responders(id)
     )
   `);
+
+  // Safe migrations for incident location fields
+  try {
+    await dbRun(`ALTER TABLE incidents ADD COLUMN location_accuracy REAL`);
+  } catch (e) {
+    // Column already exists
+  }
+  try {
+    await dbRun(`ALTER TABLE incidents ADD COLUMN location_captured_at DATETIME`);
+  } catch (e) {
+    // Column already exists
+  }
 
   await dbRun(`
     CREATE TABLE IF NOT EXISTS incident_updates (

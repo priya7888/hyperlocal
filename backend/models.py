@@ -54,6 +54,8 @@ class Incident(Base):
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     address_text = Column(String, nullable=True)
+    location_accuracy = Column(Float, nullable=True)
+    location_captured_at = Column(DateTime, default=datetime.utcnow, nullable=True)
     
     status = Column(String, default="Reported")  # "Reported", "Assigned", "Acknowledged", "En Route", "On Scene", "Resolved", "Cancelled"
     assigned_responder_id = Column(Integer, ForeignKey("responder_profiles.id"), nullable=True)

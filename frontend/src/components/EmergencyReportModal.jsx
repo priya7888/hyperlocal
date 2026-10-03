@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { 
   HeartPulse, Activity, Flame, ShieldAlert, AlertTriangle,
   Mic, MapPin, Navigation, CheckSquare, Square, X, ArrowRight,
-  CheckCircle2, RefreshCw, Volume2, Globe, Check, AlertCircle
+  CheckCircle2, RefreshCw, Volume2, Globe, Check, AlertCircle, AlertOctagon
 } from "lucide-react";
 import MapComponent from "./MapComponent";
-import { incidentApi } from "../services/api";
+import { incidentApi, geocodingApi } from "../services/api";
 
 const EMERGENCY_TYPES = [
   { id: "Medical Emergency", label: "Medical Emergency", icon: HeartPulse, color: "#2563eb", service: "Ambulance" },
@@ -57,18 +57,23 @@ export default function EmergencyReportModal({ isOpen, onClose, onSuccess }) {
     setIsLocating(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const lat = parseFloat(pos.coords.latitude.toFixed(5));
           const lng = parseFloat(pos.coords.longitude.toFixed(5));
           const acc = Math.round(pos.coords.accuracy || 12);
           setCoords({ lat, lng });
           setAccuracyMeters(acc);
-          setAddressText(`GPS: ${lat}, ${lng} (Accuracy: ~${acc}m)`);
+          try {
+            const geo = await geocodingApi.reverse(lat, lng);
+            setAddressText(geo.address || `GPS: ${lat}, ${lng} (Accuracy: ~${acc}m)`);
+          } catch (e) {
+            setAddressText(`GPS: ${lat}, ${lng} (Accuracy: ~${acc}m)`);
+          }
           setIsLocating(false);
         },
         (err) => {
           // Default fallback
-          setCoords({ lat: 12.9735, lng: 77.5985 });
+          setCoords({ lat: 17.3850, lng: 78.4867 });
           setAddressText("Central Sector (GPS permission denied - using default)");
           setIsLocating(false);
         },
@@ -348,7 +353,14 @@ export default function EmergencyReportModal({ isOpen, onClose, onSuccess }) {
                   center={[coords.lat, coords.lng]}
                   pickerMode={true}
                   pickerCoords={coords}
-                  onPickerCoordsChange={(lat, lng) => setCoords({ lat: parseFloat(lat.toFixed(5)), lng: parseFloat(lng.toFixed(5)) })}
+                  onPickerCoordsChange={(lat, lng) => {
+                    const newLat = parseFloat(lat.toFixed(5));
+                    const newLng = parseFloat(lng.toFixed(5));
+                    setCoords({ lat: newLat, lng: newLng });
+                    geocodingApi.reverse(newLat, newLng).then((res) => {
+                      if (res && res.address) setAddressText(res.address);
+                    }).catch(() => {});
+                  }}
                 />
               </div>
 

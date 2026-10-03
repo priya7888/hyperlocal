@@ -45,14 +45,23 @@ export default function LandingPage({
           </div>
         </div>
 
-        {/* Big Top SOS Button */}
-        <button
-          onClick={onTriggerSos}
-          className="btn-emergency-main"
-          style={{ padding: "10px 22px", borderRadius: "24px", fontSize: "0.95rem" }}
-        >
-          <AlertOctagon size={18} /> SOS EMERGENCY
-        </button>
+        {/* Header Actions */}
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            onClick={onContinueAsGuest}
+            className="btn-outline"
+            style={{ padding: "8px 16px", fontSize: "0.85rem", color: "#00e5ff", borderColor: "rgba(0,229,255,0.4)" }}
+          >
+            🗺️ Live Incident Map
+          </button>
+          <button
+            onClick={onTriggerSos}
+            className="btn-emergency-main"
+            style={{ padding: "10px 22px", borderRadius: "24px", fontSize: "0.95rem" }}
+          >
+            <AlertOctagon size={18} /> SOS EMERGENCY
+          </button>
+        </div>
       </header>
 
       {/* Main Hero & Portals */}

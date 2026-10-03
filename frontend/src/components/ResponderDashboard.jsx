@@ -420,8 +420,17 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
                 height="320px"
                 center={[activeIncident.lat, activeIncident.lng]}
                 zoom={14}
-                incidentLocation={{ lat: activeIncident.lat, lng: activeIncident.lng }}
-                incidentLabel={`Incident (${activeIncident.emergency_type})`}
+                incidentLocation={{
+                  lat: activeIncident.lat,
+                  lng: activeIncident.lng,
+                  id: activeIncident.id,
+                  emergency_type: activeIncident.emergency_type,
+                  severity: activeIncident.severity,
+                  status: activeIncident.status,
+                  address: activeIncident.address,
+                  created_at: activeIncident.created_at
+                }}
+                incidentLabel={`🚨 ${activeIncident.emergency_type} Emergency`}
                 responderLocation={responderCoords}
                 responderType={serviceType}
                 responderLabel={`You (${currentUser?.full_name || serviceType})`}
