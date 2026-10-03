@@ -456,23 +456,39 @@ export const responderApi = {
 // Routing with OSRM & Interpolation
 export const routingApi = {
   getRoute: async (startLat, startLng, endLat, endLng) => {
+    // If coordinates are within ~50 meters, they are already at the scene
+    const dLat = Math.abs(startLat - endLat);
+    const dLng = Math.abs(startLng - endLng);
+    if (dLat < 0.0005 && dLng < 0.0005) {
+      return {
+        coordinates: [],
+        distance_km: 0,
+        duration_minutes: 0,
+        source: "On Scene (Same Location)"
+      };
+    }
+
     try {
       const res = await api.get(`/route?start_lat=${startLat}&start_lng=${startLng}&end_lat=${endLat}&end_lng=${endLng}`);
-      return res.data;
+      if (res.data && Array.isArray(res.data.coordinates) && res.data.coordinates.length > 0) {
+        return res.data;
+      }
+      throw new Error("No route found");
     } catch (e) {
-      const steps = 15;
+      const steps = 10;
       const coords = [];
       for (let i = 0; i <= steps; i++) {
         const ratio = i / steps;
-        const lat = startLat + (endLat - startLat) * ratio + (Math.sin(ratio * Math.PI) * 0.002);
+        const lat = startLat + (endLat - startLat) * ratio;
         const lng = startLng + (endLng - startLng) * ratio;
         coords.push([lat, lng]);
       }
+      const dist = Math.sqrt(Math.pow(endLat - startLat, 2) + Math.pow(endLng - startLng, 2)) * 111;
       return {
         coordinates: coords,
-        distance_km: 2.1,
-        duration_minutes: 5,
-        source: "Live Route Interpolator"
+        distance_km: parseFloat(dist.toFixed(2)),
+        duration_minutes: Math.max(1, Math.round((dist / 35) * 60)),
+        source: "Live Route Corridor"
       };
     }
   }
