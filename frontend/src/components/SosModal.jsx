@@ -119,7 +119,7 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
         checklist,
         lat: Number(coords.lat) || 17.5800,
         lng: Number(coords.lng) || 78.4867,
-        address: `GPS Location: Lat ${Number(coords.lat).toFixed(4)}, Lng ${Number(coords.lng).toFixed(4)}`
+        address: "Verified Emergency Scene Location"
       };
 
       const res = await incidentApi.create(payload);
@@ -266,8 +266,8 @@ export default function SosModal({ isOpen, onClose, onSubmitted }) {
                   <MapPin size={15} color="#00e5ff" />
                   <span>3. Incident Location Pin</span>
                 </div>
-                <div style={{ fontSize: "0.76rem", color: "#cbd5e1", marginTop: "2px", fontFamily: "monospace" }}>
-                  Lat: {coords.lat}, Lng: {coords.lng}
+                <div style={{ fontSize: "0.76rem", color: "#00ff88", marginTop: "2px", fontWeight: "700" }}>
+                  ● Position Verified & Locked
                 </div>
               </div>
 

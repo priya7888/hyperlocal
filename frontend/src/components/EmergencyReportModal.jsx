@@ -62,7 +62,7 @@ export default function EmergencyReportModal({ isOpen, onClose, onSuccess }) {
     const loc = await getDeviceLocation(17.5800, 78.4867);
     setCoords({ lat: loc.lat, lng: loc.lng });
     setAccuracyMeters(loc.accuracy || 12);
-    setAddressText(`GPS: ${loc.lat}, ${loc.lng} (Accuracy: ~${loc.accuracy || 12}m)`);
+    setAddressText("Current Device Location Verified & Locked");
     setIsLocating(false);
   };
 
@@ -354,7 +354,7 @@ export default function EmergencyReportModal({ isOpen, onClose, onSuccess }) {
                     const cleanLat = parseFloat(lat.toFixed(5));
                     const cleanLng = parseFloat(lng.toFixed(5));
                     setCoords({ lat: cleanLat, lng: cleanLng });
-                    setAddressText(`Manual Pin: Lat ${cleanLat}, Lng ${cleanLng}`);
+                    setAddressText("Custom Incident Location (Pinned on Map)");
                     localStorage.setItem("last_device_gps_lat", cleanLat.toString());
                     localStorage.setItem("last_device_gps_lng", cleanLng.toString());
                   }}

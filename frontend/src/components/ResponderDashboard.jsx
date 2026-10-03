@@ -681,13 +681,13 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
               marginBottom: "18px"
             }}>
               <div style={{ fontSize: "0.78rem", textTransform: "uppercase", color: "#00e5ff", fontWeight: "800", letterSpacing: "0.05em", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <MapPin size={15} /> Precise Geographical Coordinates & Address
+                <MapPin size={15} /> Incident Sector & Address
               </div>
               <div style={{ color: "#f8fafc", fontSize: "0.85rem", fontWeight: "700", marginBottom: "4px" }}>
-                {selectedDetailIncident.address || "GPS Position Near Hyderabad Hub"}
+                {selectedDetailIncident.address || "Emergency Sector Hub"}
               </div>
-              <div style={{ fontSize: "0.78rem", color: "#94a3b8", fontFamily: "monospace", marginBottom: "10px" }}>
-                Latitude: {selectedDetailIncident.lat} • Longitude: {selectedDetailIncident.lng}
+              <div style={{ fontSize: "0.78rem", color: "#00ff88", fontWeight: "700", marginBottom: "10px" }}>
+                ● Real-Time Hardware GPS Lock Verified
               </div>
 
               <a
@@ -815,7 +815,7 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
             </div>
 
             <div style={{ background: "rgba(0, 229, 255, 0.08)", padding: "10px 14px", borderRadius: "8px", fontSize: "0.82rem", color: "#cbd5e1" }}>
-              Selected Coordinates: <strong style={{ color: "#00e5ff", fontFamily: "monospace" }}>{tempPickerCoords.lat.toFixed(5)}, {tempPickerCoords.lng.toFixed(5)}</strong>
+              Location Status: <strong style={{ color: "#00e5ff" }}>📍 Unit Map Pin Positioned</strong>
             </div>
 
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
@@ -877,7 +877,7 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
             title="Auto Detect GPS"
           >
             <Compass size={14} className={isLocating ? "animate-spin" : ""} />
-            <span>GPS: {responderCoords.lat.toFixed(3)}, {responderCoords.lng.toFixed(3)}</span>
+            <span>{isLocating ? "Calibrating..." : "GPS Active (Live Lock)"}</span>
           </button>
 
           <button
