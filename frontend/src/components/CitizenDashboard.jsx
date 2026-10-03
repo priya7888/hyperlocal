@@ -743,28 +743,7 @@ export default function CitizenDashboard({ currentUser, onOpenSos, onLogout, ini
                   <Phone size={14} /> Call
                 </a>
               </div>
-            ) : (
-              <div style={{
-                background: "rgba(255, 184, 0, 0.12)",
-                border: "1px solid rgba(255, 184, 0, 0.35)",
-                borderRadius: "12px",
-                padding: "12px 14px",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                color: "#ffb800"
-              }}>
-                <Clock size={20} className="animate-spin" />
-                <div style={{ fontSize: "0.78rem" }}>
-                  <div style={{ fontWeight: "800", color: "#f8fafc" }}>
-                    Awaiting Responder Acceptance
-                  </div>
-                  <div style={{ color: "#cbd5e1", marginTop: "1px" }}>
-                    5-Minute Escalation Alert broadcasted to nearest 5 {activeIncident.suggested_service} units.
-                  </div>
-                </div>
-              </div>
-            )}
+            ) : null}
 
             {/* Checklist Conditions & Details */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "4px" }}>
