@@ -147,19 +147,36 @@ export default function MapComponent({
 }) {
   const boundsPoints = useMemo(() => {
     const pts = [];
-    if (incidentLocation) pts.push([incidentLocation.lat, incidentLocation.lng]);
-    if (responderLocation) pts.push([responderLocation.lat, responderLocation.lng]);
-    if (pickerCoords && pickerMode) pts.push([pickerCoords.lat, pickerCoords.lng]);
+    if (incidentLocation && !isNaN(Number(incidentLocation.lat)) && !isNaN(Number(incidentLocation.lng))) {
+      pts.push([Number(incidentLocation.lat), Number(incidentLocation.lng)]);
+    }
+    if (responderLocation && !isNaN(Number(responderLocation.lat)) && !isNaN(Number(responderLocation.lng))) {
+      pts.push([Number(responderLocation.lat), Number(responderLocation.lng)]);
+    }
+    if (pickerCoords && pickerMode && !isNaN(Number(pickerCoords.lat)) && !isNaN(Number(pickerCoords.lng))) {
+      pts.push([Number(pickerCoords.lat), Number(pickerCoords.lng)]);
+    }
     if (routeCoordinates && routeCoordinates.length > 0) {
-      pts.push(...routeCoordinates);
+      for (const rc of routeCoordinates) {
+        if (Array.isArray(rc) && !isNaN(Number(rc[0])) && !isNaN(Number(rc[1]))) {
+          pts.push([Number(rc[0]), Number(rc[1])]);
+        }
+      }
     }
     return pts;
   }, [incidentLocation, responderLocation, pickerCoords, pickerMode, routeCoordinates]);
 
   const mapCenter = useMemo(() => {
-    if (incidentLocation) return [incidentLocation.lat, incidentLocation.lng];
-    if (pickerCoords) return [pickerCoords.lat, pickerCoords.lng];
-    return center;
+    if (incidentLocation && !isNaN(Number(incidentLocation.lat)) && !isNaN(Number(incidentLocation.lng))) {
+      return [Number(incidentLocation.lat), Number(incidentLocation.lng)];
+    }
+    if (pickerCoords && !isNaN(Number(pickerCoords.lat)) && !isNaN(Number(pickerCoords.lng))) {
+      return [Number(pickerCoords.lat), Number(pickerCoords.lng)];
+    }
+    if (Array.isArray(center) && !isNaN(Number(center[0])) && !isNaN(Number(center[1]))) {
+      return [Number(center[0]), Number(center[1])];
+    }
+    return [17.5800, 78.4867];
   }, [incidentLocation, pickerCoords, center]);
 
   return (
@@ -183,30 +200,30 @@ export default function MapComponent({
         )}
 
         {/* Incident Marker */}
-        {incidentLocation && (
+        {incidentLocation && !isNaN(Number(incidentLocation.lat)) && !isNaN(Number(incidentLocation.lng)) && (
           <Marker
-            position={[incidentLocation.lat, incidentLocation.lng]}
+            position={[Number(incidentLocation.lat), Number(incidentLocation.lng)]}
             icon={createCustomIcon("citizen", incidentLabel)}
           >
             <Popup>
               <div style={{ color: "#000", padding: "4px" }}>
                 <b style={{ color: "#ef4444" }}>🚨 {incidentLabel}</b>
-                <p style={{ fontSize: "12px", margin: "4px 0" }}>Lat: {incidentLocation.lat.toFixed(5)}, Lng: {incidentLocation.lng.toFixed(5)}</p>
+                <p style={{ fontSize: "11px", margin: "4px 0", color: "#16a34a", fontWeight: "bold" }}>● Emergency Incident Point</p>
               </div>
             </Popup>
           </Marker>
         )}
 
         {/* Responder Marker */}
-        {responderLocation && (
+        {responderLocation && !isNaN(Number(responderLocation.lat)) && !isNaN(Number(responderLocation.lng)) && (
           <Marker
-            position={[responderLocation.lat, responderLocation.lng]}
+            position={[Number(responderLocation.lat), Number(responderLocation.lng)]}
             icon={createCustomIcon(responderType, responderLabel)}
           >
             <Popup>
               <div style={{ color: "#000", padding: "4px" }}>
                 <b style={{ color: "#3b82f6" }}>{responderLabel} ({responderType})</b>
-                <p style={{ fontSize: "12px", margin: "4px 0" }}>Simulated Live Vehicle</p>
+                <p style={{ fontSize: "11px", margin: "4px 0", color: "#2563eb", fontWeight: "bold" }}>● Active Emergency Unit</p>
               </div>
             </Popup>
           </Marker>
