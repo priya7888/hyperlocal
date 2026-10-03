@@ -309,16 +309,6 @@ export default function ResponderDashboard({ currentUser, onLogout }) {
       }
     } catch (e) {}
 
-    // If location is OFF and responder was far away or uncalibrated,
-    // position responder at a realistic nearby urban deployment sector (~1.2 km from incident)
-    if (targetInc && targetInc.lat && targetInc.lng) {
-      const dist = Math.sqrt(Math.pow(currentLat - targetInc.lat, 2) + Math.pow(currentLng - targetInc.lng, 2));
-      if (dist > 0.15 || isNaN(dist)) {
-        currentLat = parseFloat((targetInc.lat + 0.009).toFixed(5));
-        currentLng = parseFloat((targetInc.lng + 0.008).toFixed(5));
-      }
-    }
-
     updateResponderLocation(currentLat, currentLng);
 
     try {

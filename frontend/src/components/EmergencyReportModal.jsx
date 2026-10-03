@@ -107,6 +107,7 @@ export default function EmergencyReportModal({ isOpen, onClose, onSuccess }) {
         lat: coords.lat,
         lng: coords.lng,
         address: addressText
+      };
       const res = await incidentApi.create(payload);
       const inc = res.incident || res.data || res;
       if (onSuccess) onSuccess(inc);
