@@ -89,6 +89,10 @@ export const isIncidentMatchingService = (incident, responderServiceType) => {
 };
 
 export default function ResponderDashboard({ currentUser, onLogout }) {
+  const serviceType = currentUser?.service_type || currentUser?.serviceType || "Ambulance / Medical";
+  const responderName = currentUser?.full_name || currentUser?.name || "Responder Unit";
+  const simIntervalRef = useRef(null);
+
   const [incidents, setIncidents] = useState([]);
   const [activeIncident, setActiveIncident] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
