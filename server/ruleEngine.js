@@ -33,7 +33,16 @@ function estimateTravelTime(distanceKm) {
 // OSRM Road Routing
 async function fetchOsrmRoute(startLat, startLng, endLat, endLng) {
   const straightLine = calculateHaversineDistance(startLat, startLng, endLat, endLng);
-  const straightEst = estimateTravelTime(straightLine.km);
+  
+  // If responder and incident are within 50 meters, they have arrived (no route needed)
+  if (straightLine.km < 0.05) {
+    return {
+      coordinates: [],
+      distance_km: 0,
+      duration_minutes: 0,
+      source: 'On Scene (Same Location)'
+    };
+  }
 
   const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
   try {
@@ -54,23 +63,22 @@ async function fetchOsrmRoute(startLat, startLng, endLat, endLng) {
     // Fallback to interpolated waypoints
   }
 
-  // Fallback synthetic curved waypoints
+  // Fallback straight-line interpolated waypoints (only if actual distance exists)
   const steps = 8;
   const coords = [];
   for (let i = 0; i <= steps; i++) {
     const ratio = i / steps;
-    const curve = Math.sin(ratio * Math.PI) * 0.002;
     coords.push([
-      parseFloat((startLat + (endLat - startLat) * ratio + curve).toFixed(6)),
-      parseFloat((startLng + (endLng - startLng) * ratio + curve * 0.5).toFixed(6))
+      parseFloat((startLat + (endLat - startLat) * ratio).toFixed(6)),
+      parseFloat((startLng + (endLng - startLng) * ratio).toFixed(6))
     ]);
   }
 
   return {
     coordinates: coords,
-    distance_km: straightLine.km,
-    duration_minutes: straightEst.minutes,
-    source: 'Direct Interpolation (Fallback)'
+    distance_km: parseFloat(straightLine.km.toFixed(2)),
+    duration_minutes: Math.max(1, Math.round(straightLine.km / 35 * 60)),
+    source: 'Direct Vector Corridor'
   };
 }
 
